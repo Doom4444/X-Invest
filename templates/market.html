@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<!-- Owner: Teammate 4 | Served by GET /market in main.py
+     market.js fetches /api/market/companies and /api/market/{ticker}. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>X‑Invest – Markets</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body class="market-page">
+    <!-- Shared navbar -->
+    <header class="navbar">
+      <div class="navbar-left">
+        <a href="/">
+          <div class="logo-mark">X</div>
+        </a>
+        <a href="/" class="logo-text">
+          <span>Invest</span>
+        </a>
+      </div>
+      <nav class="nav-links">
+        <a href="/">Home</a>
+        <a href="/chat">Chat</a>
+        <a href="/market">Markets</a>
+        <a href="#" class="pill">
+          <span class="pill-dot"></span>
+          <span>Login (soon)</span>
+        </a>
+      </nav>
+    </header>
+
+    <main class="market-main">
+      <header class="market-header">
+        <div>
+          <h1>Markets &amp; Companies</h1>
+          <p>Browse curated tickers and open a real‑time dashboard.</p>
+        </div>
+      </header>
+
+      <section class="market-layout" id="market-container">
+        <aside class="company-list" id="company-list">
+          <!-- Filled by market.js -->
+        </aside>
+
+        <section class="dashboard-panel hidden" id="dashboard-panel">
+          <!-- Filled by market.js -->
+        </section>
+      </section>
+    </main>
+
+    <script src="/static/js/market.js"></script>
+  </body>
+</html>

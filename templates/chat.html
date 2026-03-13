@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<!-- Owner: Teammate 4 | Served by GET /chat in main.py -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>X‑Invest – Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body class="chat-page">
+    <!-- Shared navbar -->
+    <header class="navbar">
+      <div class="navbar-left">
+        <a href="/">
+          <div class="logo-mark">X</div>
+        </a>
+        <a href="/" class="logo-text">
+          <span>Invest</span>
+        </a>
+      </div>
+      <nav class="nav-links">
+        <a href="/">Home</a>
+        <a href="/chat">Chat</a>
+        <a href="/market">Markets</a>
+        <a href="#" class="pill">
+          <span class="pill-dot"></span>
+          <span>Login (soon)</span>
+        </a>
+      </nav>
+    </header>
+
+    <main class="chat-page-main">
+      <!-- Center greeting -->
+      <section class="chat-greeting">
+        <h1>Welcome to X‑Invest</h1>
+        <p>
+          Ask anything about
+          <kbd>stocks</kbd>,
+          <kbd>markets</kbd>,
+          <kbd>signals</kbd>, or
+          <kbd>fundamentals</kbd> — the assistant is finance‑only.
+        </p>
+      </section>
+
+      <!-- Chat box -->
+      <section class="chat-shell">
+        <div class="chat-container">
+          <div class="chat-messages" id="messages">
+            <div class="empty-state" id="emptyState">
+              <h3>Your financial copilot is ready.</h3>
+              <p>
+                Start by asking about a company, a portfolio idea, or a risk question.
+                <br />
+                Use <kbd>Enter</kbd> to send and <kbd>Shift+Enter</kbd> for a new line.
+              </p>
+            </div>
+          </div>
+
+          <div class="input-area">
+            <div class="input-row">
+              <textarea
+                id="userInput"
+                rows="1"
+                placeholder="Ask about markets, companies, or investment ideas…"
+              ></textarea>
+              <!-- Paper-plane icon button — same SVG as Ollama_Chatbot_UI -->
+              <button id="sendBtn" type="button" title="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                </svg>
+              </button>
+            </div>
+            <div class="chat-footer-row">
+              <div class="hint" id="status"></div>
+              <div class="chat-footer-actions">
+                <button id="newChatBtn" type="button">New chat</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/js/chat.js"></script>
+  </body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<!-- Owner: Teammate 4 | Home / landing page for X‑Invest -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>X‑Invest – Home</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <style>
+      body.home-page {
+        background:
+          radial-gradient(circle at top, rgba(6, 21, 42, 0.9) 0, rgba(2, 12, 27, 0.95) 40%, rgba(0, 0, 0, 0.98) 100%),
+          url('/static/img/{{ home_bg_file }}?v={{ home_bg_version }}');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+    </style>
+  </head>
+  <body class="home-page">
+    <!-- Shared navbar (logo left, links right) -->
+    <header class="navbar">
+      <div class="navbar-left">
+        <a href="/">
+          <div class="logo-mark">X</div>
+        </a>
+        <a href="/" class="logo-text">
+          <span>Invest</span>
+        </a>
+      </div>
+      <nav class="nav-links">
+        <a href="/">Home</a>
+        <a href="/chat">Chat</a>
+        <a href="/market">Markets</a>
+        <a href="#" class="pill">
+          <span class="pill-dot"></span>
+          <span>Login (soon)</span>
+        </a>
+      </nav>
+    </header>
+
+    <main class="home-main">
+      <section class="home-hero">
+        <div class="home-hero-copy">
+          <h1>
+            Smart investing with
+            <span>X‑Invest</span>
+          </h1>
+          <p>
+            An AI‑powered assistant focused only on finance and markets, built on your X‑Invest
+            research and signals.
+          </p>
+
+          <div class="home-hero-badges">
+            <div class="badge">
+              <strong>Arabic + English</strong> market coverage
+            </div>
+            <div class="badge">
+              <strong>Real data</strong> + custom signals
+            </div>
+          </div>
+
+          <div class="home-actions">
+            <button
+              class="btn btn-primary"
+              type="button"
+              onclick="window.location.href='/chat'"
+            >
+              Continue as guest
+            </button>
+            <button class="btn btn-outline" type="button">
+              Login (coming soon)
+            </button>
+          </div>
+        </div>
+
+        <aside class="home-hero-right">
+          <div class="home-card" aria-hidden="true">
+            <div class="home-card-header">
+              <div class="home-card-title">Sample portfolio snapshot</div>
+              <div class="home-card-chip">Live demo</div>
+            </div>
+            <div class="home-card-balance">$125,430</div>
+            <div class="home-card-sub">
+              <span class="pill-positive">+4,820 (this month)</span>
+            </div>
+            <div class="home-card-grid">
+              <div class="home-small-card">
+                <span>Active positions</span>
+                <span>12</span>
+              </div>
+              <div class="home-small-card">
+                <span>Risk score</span>
+                <span class="pill-soft">Balanced</span>
+              </div>
+              <div class="home-small-card">
+                <span>Top market</span>
+                <span>NASDAQ</span>
+              </div>
+              <div class="home-small-card">
+                <span>Focus</span>
+                <span>Equities &amp; ETFs</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
