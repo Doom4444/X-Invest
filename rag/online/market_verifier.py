@@ -1,52 +1,52 @@
-class MarketVerifier:
+# class MarketVerifier:
 
-    def __init__(self):
+#     def __init__(self):
 
-        # الحد الأقصى للاختلاف المقبول
-        self.max_deviation = 0.05
+#         # الحد الأقصى للاختلاف المقبول
+#         self.max_deviation = 0.05
 
-    def verify(self, results):
+#     def verify(self, results):
 
-        if not results:
-            return None, "0%"
+#         if not results:
+#             return None, "0%"
 
-        prices = [r["price"] for r in results]
+#         prices = [r["price"] for r in results]
 
-        # لو مصدر واحد فقط
-        if len(prices) == 1:
+#         # لو مصدر واحد فقط
+#         if len(prices) == 1:
 
-            price = round(prices[0], 2)
+#             price = round(prices[0], 2)
 
-            confidence = "65%"
+#             confidence = "65%"
 
-            return price, confidence
+#             return price, confidence
 
-        # حساب المتوسط
-        avg_price = sum(prices) / len(prices)
+#         # حساب المتوسط
+#         avg_price = sum(prices) / len(prices)
 
-        # أكبر فرق
-        max_diff = max(abs(p - avg_price) for p in prices)
+#         # أكبر فرق
+#         max_diff = max(abs(p - avg_price) for p in prices)
 
-        # نسبة الاختلاف
-        deviation = max_diff / avg_price
+#         # نسبة الاختلاف
+#         deviation = max_diff / avg_price
 
-        # حساب الثقة
-        if deviation < 0.01:
+#         # حساب الثقة
+#         if deviation < 0.01:
 
-            confidence = 95
+#             confidence = 95
 
-        elif deviation < 0.03:
+#         elif deviation < 0.03:
 
-            confidence = 85
+#             confidence = 85
 
-        elif deviation < self.max_deviation:
+#         elif deviation < self.max_deviation:
 
-            confidence = 70
+#             confidence = 70
 
-        else:
+#         else:
 
-            confidence = 50
+#             confidence = 50
 
-        price = round(avg_price, 2)
+#         price = round(avg_price, 2)
 
-        return price, f"{confidence}%"
+#         return price, f"{confidence}%"

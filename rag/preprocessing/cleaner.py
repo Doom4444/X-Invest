@@ -1,11 +1,11 @@
-import re
+# import re
 
-def clean_text(text: str) -> str:
-    """
-    Clean text before chunking.
-    """
+# def clean_text(text: str) -> str:
+#     """
+#     Clean text before chunking.
+#     """
 
-    text = re.sub(r"\s+", " ", text)
-    text = text.strip()
+#     text = re.sub(r"\s+", " ", text)
+#     text = text.strip()
 
-    return text
+#     return text
