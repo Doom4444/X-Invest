@@ -1,129 +1,91 @@
-import re
-import json
-import ollama
-
-
-class AssetExtractor:
+class MarketVerifier:
 
     def __init__(self):
 
-        self.model = "iKhalid/ALLaM:7b"
+        # Maximum acceptable deviation
+        self.max_deviation = 0.05
 
-        # -----------------------------
-        # Known assets dictionary
-        # -----------------------------
-        self.known_assets = {
+    # -----------------------------------
+    # Verify market results
+    # -----------------------------------
+    def verify(self, results):
 
-            # Stocks
-            "tesla": ("Tesla", "stock", "TSLA"),
-            "apple": ("Apple", "stock", "AAPL"),
-            "microsoft": ("Microsoft", "stock", "MSFT"),
+        # No results
+        if not results:
 
-            # Crypto
-            "bitcoin": ("Bitcoin", "crypto", "BTC"),
-            "btc": ("Bitcoin", "crypto", "BTC"),
-            "ethereum": ("Ethereum", "crypto", "ETH"),
+            return None, 0.0
 
-            # Commodities
-            "gold": ("Gold", "commodity", "XAUUSD"),
-            "silver": ("Silver", "commodity", "XAGUSD"),
-            "oil": ("Oil", "commodity", "CL"),
+        # Extract prices
+        prices = [
+            r["price"]
+            for r in results
+            if r.get("price") is not None
+        ]
 
-            # Forex
-            "eurusd": ("EUR/USD", "forex", "EURUSD"),
-            "usd/jpy": ("USD/JPY", "forex", "USDJPY")
-        }
+        # No valid prices
+        if not prices:
 
-    # -----------------------------
-    # Rule Layer
-    # -----------------------------
-    def rule_extract(self, question):
+            return None, 0.0
 
-        q = question.lower()
+        # -----------------------------------
+        # Single source
+        # -----------------------------------
+        if len(prices) == 1:
 
-        for key, value in self.known_assets.items():
+            price = round(prices[0], 2)
 
-            if key in q:
+            confidence = 65.0
 
-                return {
-                    "asset_name": value[0],
-                    "asset_type": value[1],
-                    "possible_symbol": value[2],
-                    "method": "rule"
-                }
+            return price, confidence
 
-        return None
+        # -----------------------------------
+        # Multi-source average
+        # -----------------------------------
+        avg_price = sum(prices) / len(prices)
 
-    # -----------------------------
-    # LLM Fallback
-    # -----------------------------
-    def llm_extract(self, question):
+        # Largest deviation
+        max_diff = max(
+            abs(p - avg_price)
+            for p in prices
+        )
 
-        prompt = f"""
-Extract the financial asset from the question.
+        # Relative deviation
+        deviation = max_diff / avg_price
 
-Return ONLY valid JSON.
+        # -----------------------------------
+        # Confidence calculation
+        # -----------------------------------
+        if deviation < 0.01:
 
-Format:
-{{
-  "asset_name": "...",
-  "asset_type": "...",
-  "possible_symbol": "..."
-}}
+            confidence = 95.0
 
-Question:
-{question}
-"""
+        elif deviation < 0.03:
 
-        try:
+            confidence = 85.0
 
-            response = ollama.chat(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
-            )
+        elif deviation < self.max_deviation:
 
-            text = response["message"]["content"].strip()
+            confidence = 70.0
 
-            # remove markdown json formatting
-            text = re.sub(r"```json|```", "", text).strip()
+        else:
 
-            data = json.loads(text)
+            confidence = 50.0
 
-            data["method"] = "llm"
+        # Final rounded price
+        final_price = round(avg_price, 2)
 
-            return data
+        print(
+            f"[Verifier] Avg Price: {final_price}"
+        )
 
-        except Exception as e:
+        print(
+            f"[Verifier] Deviation: "
+            f"{round(deviation, 4)}"
+        )
 
-            print("[AssetExtractor] LLM extraction failed:", e)
+        print(
+            f"[Verifier] Confidence: "
+            f"{confidence}%"
+        )
 
-            return {
-                "asset_name": None,
-                "asset_type": None,
-                "possible_symbol": None,
-                "method": "failed"
-            }
-
-    # -----------------------------
-    # Main Extraction
-    # -----------------------------
-    def extract(self, question):
-
-        # 1. Rule-based extraction
-        result = self.rule_extract(question)
-
-        if result:
-
-            print("[AssetExtractor] Rule match")
-
-            return result
-
-        # 2. LLM fallback
-        print("[AssetExtractor] Using LLM fallback")
-
-        return self.llm_extract(question)
+        return final_price, confidence

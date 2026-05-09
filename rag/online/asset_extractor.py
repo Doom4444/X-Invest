@@ -1,97 +1,158 @@
-# import ollama
-# import json
+import re
+import json
+import ollama
 
 
-# class AssetExtractor:
+class AssetExtractor:
 
-#     def __init__(self):
+    def __init__(self):
 
-#         self.model = "iKhalid/ALLaM:7b"
+        self.model = "iKhalid/ALLaM:7b"
 
-#     def extract(self, question):
+        # -----------------------------
+        # Known assets dictionary
+        # -----------------------------
+        self.known_assets = {
 
-#         prompt = f"""
-# You are a financial entity extraction system.
+            # Stocks
+            "tesla": ("Tesla", "stock", "TSLA"),
+            "apple": ("Apple", "stock", "AAPL"),
+            "microsoft": ("Microsoft", "stock", "MSFT"),
+            "amazon": ("Amazon", "stock", "AMZN"),
+            "google": ("Google", "stock", "GOOGL"),
+            "meta": ("Meta", "stock", "META"),
+            "nvidia": ("NVIDIA", "stock", "NVDA"),
 
-# Your task is to analyze a user question and identify the financial asset being referenced.
+            # Crypto
+            "bitcoin": ("Bitcoin", "crypto", "BTC"),
+            "btc": ("Bitcoin", "crypto", "BTC"),
+            "ethereum": ("Ethereum", "crypto", "ETH"),
+            "eth": ("Ethereum", "crypto", "ETH"),
 
-# The asset may belong to ANY financial category including but not limited to:
-# - Stocks
-# - Cryptocurrencies
-# - Forex currencies
-# - Commodities
-# - Market indices
-# - ETFs
-# - Bonds
+            # Commodities
+            "gold": ("Gold", "commodity", "XAUUSD"),
+            "silver": ("Silver", "commodity", "XAGUSD"),
+            "oil": ("Oil", "commodity", "CL"),
 
-# Instructions:
-# 1. Identify the asset mentioned in the question.
-# 2. Determine the most likely asset type.
-# 3. Extract the most relevant symbol or ticker if possible.
-# 4. If no clear ticker exists, return the asset name only.
+            # Forex
+            "eurusd": ("EUR/USD", "forex", "EURUSD"),
+            "usdjpy": ("USD/JPY", "forex", "USDJPY"),
+            "usd/jpy": ("USD/JPY", "forex", "USDJPY")
+        }
 
-# Return your answer ONLY as JSON in the following format:
+    # -----------------------------
+    # Rule-based Extraction
+    # -----------------------------
+    def rule_extract(self, question):
 
-# {{
-#  "asset_name": "...",
-#  "asset_type": "...",
-#  "possible_symbol": "..."
-# }}
+        q = question.lower()
 
-# Examples:
+        for key, value in self.known_assets.items():
 
-# Question: What is Tesla stock price?
-# {{
-#  "asset_name": "Tesla",
-#  "asset_type": "stock",
-#  "possible_symbol": "TSLA"
-# }}
+            if key in q:
 
-# Question: What is gold price today?
-# {{
-#  "asset_name": "Gold",
-#  "asset_type": "commodity",
-#  "possible_symbol": "XAUUSD"
-# }}
+                return {
 
-# Question: Bitcoin price now
-# {{
-#  "asset_name": "Bitcoin",
-#  "asset_type": "crypto",
-#  "possible_symbol": "BTC"
-# }}
+                    "asset_name": value[0],
 
-# Question: USD to EUR rate
-# {{
-#  "asset_name": "USD/EUR",
-#  "asset_type": "forex",
-#  "possible_symbol": "EURUSD"
-# }}
+                    "asset_type": value[1],
 
-# Now analyze this question:
+                    "possible_symbol": value[2],
 
-# Question:
-# {question}
-# """
+                    "method": "rule"
+                }
 
-#         try:
+        return None
 
-#             response = ollama.chat(
-#                 model=self.model,
-#                 messages=[{"role": "user", "content": prompt}]
-#             )
+    # -----------------------------
+    # LLM Fallback Extraction
+    # -----------------------------
+    def llm_extract(self, question):
 
-#             text = response["message"]["content"].strip()
+        prompt = f"""
+Extract the financial asset from the question.
 
-#             data = json.loads(text)
+Return ONLY valid JSON.
 
-#             return data
+Format:
+{{
+  "asset_name": "...",
+  "asset_type": "...",
+  "possible_symbol": "..."
+}}
 
-#         except Exception:
+Question:
+{question}
+"""
 
-            
-#             return {
-#                 "asset_name": None,
-#                 "asset_type": None,
-#                 "possible_symbol": None
-#             }
+        try:
+
+            response = ollama.chat(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
+
+            text = (
+                response["message"]["content"]
+                .strip()
+            )
+
+            # Remove markdown formatting
+            text = re.sub(
+                r"```json|```",
+                "",
+                text
+            ).strip()
+
+            data = json.loads(text)
+
+            data["method"] = "llm"
+
+            return data
+
+        except Exception as e:
+
+            print(
+                "[AssetExtractor] "
+                f"LLM extraction failed: {e}"
+            )
+
+            return {
+
+                "asset_name": None,
+
+                "asset_type": None,
+
+                "possible_symbol": None,
+
+                "method": "failed"
+            }
+
+    # -----------------------------
+    # Main Extraction Pipeline
+    # -----------------------------
+    def extract(self, question):
+
+        # 1. Rule-based extraction
+        result = self.rule_extract(question)
+
+        if result:
+
+            print(
+                "[AssetExtractor] Rule match"
+            )
+
+            return result
+
+        # 2. LLM fallback
+        print(
+            "[AssetExtractor] "
+            "Using LLM fallback"
+        )
+
+        return self.llm_extract(question)

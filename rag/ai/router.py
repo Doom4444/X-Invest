@@ -128,12 +128,7 @@ class Router:
 
                     if market_confidence is not None:
 
-                        confidence_scores.append(
-                            float(
-                                str(market_confidence)
-                                .replace("%", "")
-                            )
-                        )
+                         confidence_scores.append( market_confidence)
 
                 else:
 
