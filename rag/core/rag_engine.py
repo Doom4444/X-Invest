@@ -1,5 +1,5 @@
-from rag.retriever import Retriever
-from rag.llm_engine import LLMEngine
+from rag.core.retriever import Retriever
+from rag.ai.llm_engine import LLMEngine
 
 
 class RAGEngine:

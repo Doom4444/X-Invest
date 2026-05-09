@@ -1,5 +1,5 @@
 import chromadb
-from rag.embeddings import EmbeddingModel
+from rag.core.embeddings import EmbeddingModel
 
 
 class VectorStore:

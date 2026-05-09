@@ -1,7 +1,7 @@
-from rag.query_analyzer import QueryAnalyzer
+from rag.ai.query_analyzer import QueryAnalyzer
 
-from rag.rag_engine import RAGEngine
-from rag.llm.llm_engine import LLMEngine
+from rag.core.rag_engine import RAGEngine
+from rag.ai.llm_engine import LLMEngine
 
 from rag.online.asset_extractor import AssetExtractor
 from rag.online.market_fetcher import MarketFetcher

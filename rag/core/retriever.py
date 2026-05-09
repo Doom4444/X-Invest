@@ -1,5 +1,5 @@
 # rag/retriever.py
-from rag.vector_store import VectorStore
+from rag.core.vector_store import VectorStore
 
 
 class Retriever:

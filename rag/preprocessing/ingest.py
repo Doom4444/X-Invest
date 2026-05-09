@@ -1,8 +1,8 @@
 import os
 import uuid
 
-from rag.utils import load_document, clean_text, chunk_text
-from rag.vector_store import VectorStore
+from rag.preprocessing.utils import load_document, clean_text, chunk_text
+from rag.core.vector_store import VectorStore
 
 
 def ingest_folder(folder_path: str):
