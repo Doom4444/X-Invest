@@ -1,52 +1,129 @@
-# class MarketVerifier:
+import re
+import json
+import ollama
 
-#     def __init__(self):
 
-#         # الحد الأقصى للاختلاف المقبول
-#         self.max_deviation = 0.05
+class AssetExtractor:
 
-#     def verify(self, results):
+    def __init__(self):
 
-#         if not results:
-#             return None, "0%"
+        self.model = "iKhalid/ALLaM:7b"
 
-#         prices = [r["price"] for r in results]
+        # -----------------------------
+        # Known assets dictionary
+        # -----------------------------
+        self.known_assets = {
 
-#         # لو مصدر واحد فقط
-#         if len(prices) == 1:
+            # Stocks
+            "tesla": ("Tesla", "stock", "TSLA"),
+            "apple": ("Apple", "stock", "AAPL"),
+            "microsoft": ("Microsoft", "stock", "MSFT"),
 
-#             price = round(prices[0], 2)
+            # Crypto
+            "bitcoin": ("Bitcoin", "crypto", "BTC"),
+            "btc": ("Bitcoin", "crypto", "BTC"),
+            "ethereum": ("Ethereum", "crypto", "ETH"),
 
-#             confidence = "65%"
+            # Commodities
+            "gold": ("Gold", "commodity", "XAUUSD"),
+            "silver": ("Silver", "commodity", "XAGUSD"),
+            "oil": ("Oil", "commodity", "CL"),
 
-#             return price, confidence
+            # Forex
+            "eurusd": ("EUR/USD", "forex", "EURUSD"),
+            "usd/jpy": ("USD/JPY", "forex", "USDJPY")
+        }
 
-#         # حساب المتوسط
-#         avg_price = sum(prices) / len(prices)
+    # -----------------------------
+    # Rule Layer
+    # -----------------------------
+    def rule_extract(self, question):
 
-#         # أكبر فرق
-#         max_diff = max(abs(p - avg_price) for p in prices)
+        q = question.lower()
 
-#         # نسبة الاختلاف
-#         deviation = max_diff / avg_price
+        for key, value in self.known_assets.items():
 
-#         # حساب الثقة
-#         if deviation < 0.01:
+            if key in q:
 
-#             confidence = 95
+                return {
+                    "asset_name": value[0],
+                    "asset_type": value[1],
+                    "possible_symbol": value[2],
+                    "method": "rule"
+                }
 
-#         elif deviation < 0.03:
+        return None
 
-#             confidence = 85
+    # -----------------------------
+    # LLM Fallback
+    # -----------------------------
+    def llm_extract(self, question):
 
-#         elif deviation < self.max_deviation:
+        prompt = f"""
+Extract the financial asset from the question.
 
-#             confidence = 70
+Return ONLY valid JSON.
 
-#         else:
+Format:
+{{
+  "asset_name": "...",
+  "asset_type": "...",
+  "possible_symbol": "..."
+}}
 
-#             confidence = 50
+Question:
+{question}
+"""
 
-#         price = round(avg_price, 2)
+        try:
 
-#         return price, f"{confidence}%"
+            response = ollama.chat(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
+
+            text = response["message"]["content"].strip()
+
+            # remove markdown json formatting
+            text = re.sub(r"```json|```", "", text).strip()
+
+            data = json.loads(text)
+
+            data["method"] = "llm"
+
+            return data
+
+        except Exception as e:
+
+            print("[AssetExtractor] LLM extraction failed:", e)
+
+            return {
+                "asset_name": None,
+                "asset_type": None,
+                "possible_symbol": None,
+                "method": "failed"
+            }
+
+    # -----------------------------
+    # Main Extraction
+    # -----------------------------
+    def extract(self, question):
+
+        # 1. Rule-based extraction
+        result = self.rule_extract(question)
+
+        if result:
+
+            print("[AssetExtractor] Rule match")
+
+            return result
+
+        # 2. LLM fallback
+        print("[AssetExtractor] Using LLM fallback")
+
+        return self.llm_extract(question)
