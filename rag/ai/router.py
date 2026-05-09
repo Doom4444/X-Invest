@@ -84,15 +84,21 @@ class Router:
 
             rag_response = self.rag.ask(question)
 
-            contexts.append(
-                f"RAG INFORMATION:\n{rag_response['answer']}"
-            )
+            if rag_response["context"].strip():
 
-            rag_confidence = self.calculate_confidence(
-                rag_response.get("distances")
-            )
+                contexts.append(
+                    f"RAG INFORMATION:\n{rag_response['context']}"
+                )
 
-            confidence_scores.append(rag_confidence)
+                rag_confidence = self.calculate_confidence(
+                    rag_response.get("distances")
+                )
+
+                confidence_scores.append(rag_confidence)
+
+            else:
+
+                print("[Router] Empty RAG context")
 
         # -----------------------------
         # 4. Market Data Layer
@@ -120,9 +126,22 @@ class Router:
                         f"{symbol} current price is ${price}"
                     )
 
-                    confidence_scores.append(
-                        float(str(market_confidence).replace("%", ""))
-                    )
+                    if market_confidence is not None:
+
+                        confidence_scores.append(
+                            float(
+                                str(market_confidence)
+                                .replace("%", "")
+                            )
+                        )
+
+                else:
+
+                    print("[Router] Market fetch failed")
+
+            else:
+
+                print("[Router] No symbol detected")
 
         # -----------------------------
         # 5. Forecast Layer
@@ -146,7 +165,8 @@ class Router:
             else:
 
                 contexts.append(
-                    "PREDICTION:\nForecast model not available yet."
+                    "PREDICTION:\n"
+                    "Forecast model not available yet."
                 )
 
         # -----------------------------
@@ -167,13 +187,24 @@ class Router:
         # -----------------------------
         fused_context = "\n\n".join(contexts)
 
+        print("\n[Router] Fused Context:")
+        print(fused_context)
+
         # -----------------------------
         # 8. Final Response Generation
         # -----------------------------
-        final_answer = self.llm.generate(
-            question=question,
-            context=fused_context
-        )
+        if fused_context.strip():
+
+            final_answer = self.llm.generate(
+                question=question,
+                context=fused_context
+            )
+
+        else:
+
+            final_answer = self.llm.generate(
+                question=question
+            )
 
         # -----------------------------
         # 9. Final Confidence
