@@ -13,6 +13,7 @@ class QueryAnalyzer:
         # Models
         # -----------------------------
         self.embedding_model = "nomic-embed-text"
+
         self.llm_model = "iKhalid/ALLaM:7b"
 
         # -----------------------------
@@ -25,40 +26,59 @@ class QueryAnalyzer:
         # -----------------------------
         self.intents = {
 
-            "document_lookup": [
-                "revenue in 2020",
-                "financial report numbers",
-                "income statement value"
-            ],
-
             "market_data": [
-                "tesla stock price",
-                "bitcoin price",
-                "gold price today"
+
+                "tesla stock price today",
+
+                "bitcoin price now",
+
+                "gold current price",
+
+                "latest oil price"
             ],
 
             "general_finance": [
+
                 "what is diversification",
+
                 "what is investing",
-                "define portfolio"
+
+                "define portfolio",
+
+                "what is inflation"
             ],
 
             "analysis": [
+
                 "should i invest in tesla",
+
                 "portfolio strategy advice",
-                "market analysis"
+
+                "market analysis",
+
+                "stock market risks"
             ],
 
             "forecast": [
+
                 "predict tesla price",
+
                 "future stock price",
-                "market forecast"
+
+                "market forecast",
+
+                "next year stock prediction"
             ],
 
             "news_analysis": [
+
                 "why is tesla dropping",
+
                 "latest market news",
-                "how news affects stocks"
+
+                "how news affects stocks",
+
+                "economic news impact"
             ]
         }
 
@@ -81,13 +101,17 @@ class QueryAnalyzer:
             for text in examples:
 
                 emb = ollama.embeddings(
+
                     model=self.embedding_model,
+
                     prompt=text
                 )["embedding"]
 
                 embeddings.append(emb)
 
-            self.intent_embeddings[intent] = np.array(embeddings)
+            self.intent_embeddings[intent] = (
+                np.array(embeddings)
+            )
 
     # -----------------------------
     # Rule Layer
@@ -96,20 +120,40 @@ class QueryAnalyzer:
 
         q = question.lower()
 
-        # market data
-        if re.search(r"price|stock|ticker|usd|btc|gold|oil", q):
-            return "market_data", 0.95, "rule"
+        # -----------------------------
+        # Forecast FIRST
+        # -----------------------------
+        if re.search(
 
-        # document retrieval
-        if re.search(r"revenue|income|financial statement|report", q):
-            return "document_lookup", 0.95, "rule"
+            r"predict|forecast|future|next year",
 
-        # forecasting
-        if re.search(r"predict|forecast|future price", q):
+            q
+        ):
+
             return "forecast", 0.95, "rule"
 
-        # news analysis
-        if re.search(r"news|breaking|latest|today|impact", q):
+        # -----------------------------
+        # Market Data
+        # -----------------------------
+        if re.search(
+
+            r"price|today|current|now|live|latest|market|trading|ticker|usd|btc|gold|oil",
+
+            q
+        ):
+
+            return "market_data", 0.95, "rule"
+
+        # -----------------------------
+        # News Analysis
+        # -----------------------------
+        if re.search(
+
+            r"news|breaking|headline|impact|geopolitical",
+
+            q
+        ):
+
             return "news_analysis", 0.92, "rule"
 
         return None, 0, None
@@ -120,22 +164,30 @@ class QueryAnalyzer:
     def embedding_layer(self, question):
 
         q_emb = ollama.embeddings(
+
             model=self.embedding_model,
+
             prompt=question
+
         )["embedding"]
 
         q_emb = np.array(q_emb).reshape(1, -1)
 
         best_intent = None
+
         best_score = 0
 
         for intent, emb in self.intent_embeddings.items():
 
-            score = cosine_similarity(q_emb, emb).max()
+            score = cosine_similarity(
+                q_emb,
+                emb
+            ).max()
 
             if score > best_score:
 
                 best_score = score
+
                 best_intent = intent
 
         return best_intent, best_score
@@ -146,10 +198,10 @@ class QueryAnalyzer:
     def llm_layer(self, question):
 
         prompt = f"""
-Classify the following finance question into ONE category.
+Classify the following finance question
+into ONE category.
 
 Categories:
-document_lookup
 market_data
 general_finance
 analysis
@@ -163,51 +215,74 @@ Question:
 """
 
         response = ollama.chat(
+
             model=self.llm_model,
-            messages=[{"role": "user", "content": prompt}]
+
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
         )
 
-        return response["message"]["content"].strip()
+        return (
+            response["message"]["content"]
+            .strip()
+        )
 
     # -----------------------------
-    # Routing Logic
+    # Routing Metadata
     # -----------------------------
-    def build_metadata(self, intent, confidence, method):
+    def build_metadata(
+        self,
+        intent,
+        confidence,
+        method
+    ):
 
         metadata = {
 
             "intent": intent,
-            "confidence": round(confidence, 3),
+
+            "confidence": round(
+                float(confidence),
+                3
+            ),
+
             "method": method,
 
-            # routing flags
-            "needs_rag": False,
             "needs_prediction": False,
+
             "needs_news": False,
+
             "needs_market_data": False
         }
 
         # -----------------------------
         # Intent Routing
         # -----------------------------
-        if intent == "document_lookup":
-            metadata["needs_rag"] = True
+        if intent == "forecast":
 
-        elif intent == "forecast":
             metadata["needs_prediction"] = True
+
             metadata["needs_market_data"] = True
 
         elif intent == "market_data":
+
             metadata["needs_market_data"] = True
 
         elif intent == "news_analysis":
+
             metadata["needs_news"] = True
+
             metadata["needs_market_data"] = True
 
         elif intent == "analysis":
+
             metadata["needs_prediction"] = True
+
             metadata["needs_news"] = True
-            metadata["needs_rag"] = True
 
         return metadata
 
@@ -219,32 +294,45 @@ Question:
         # -----------------------------
         # 1. Rule Layer
         # -----------------------------
-        intent, confidence, method = self.rule_layer(question)
+        intent, confidence, method = (
+            self.rule_layer(question)
+        )
 
         if confidence > 0.9:
 
             print("[Analyzer] Rule match")
 
             return self.build_metadata(
+
                 intent,
+
                 confidence,
+
                 method
             )
 
         # -----------------------------
         # 2. Semantic Layer
         # -----------------------------
-        intent, score = self.embedding_layer(question)
+        intent, score = (
+            self.embedding_layer(question)
+        )
 
-        print(f"[Analyzer] Semantic score: {round(score,3)}")
+        print(
+            f"[Analyzer] Semantic score: "
+            f"{round(score, 3)}"
+        )
 
         if score > self.semantic_threshold:
 
             print("[Analyzer] Semantic match")
 
             return self.build_metadata(
+
                 intent,
+
                 score,
+
                 "semantic"
             )
 
@@ -256,7 +344,10 @@ Question:
         intent = self.llm_layer(question)
 
         return self.build_metadata(
+
             intent,
+
             0.65,
+
             "llm"
         )

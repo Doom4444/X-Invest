@@ -36,20 +36,38 @@ class Router:
         if not distances:
             return 70.0
 
-        similarities = [1 - d for d in distances]
+        similarities = []
 
-        avg_similarity = sum(similarities) / len(similarities)
+        for d in distances:
+
+            similarity = 1 / (1 + d)
+
+            similarities.append(similarity)
+
+        avg_similarity = (
+            sum(similarities) /
+            len(similarities)
+        )
 
         strong_matches = [
+
             s for s in similarities
+
             if s > 0.75
         ]
 
-        consistency = len(strong_matches) / len(similarities)
+        consistency = (
+            len(strong_matches) /
+            len(similarities)
+        )
 
         confidence = round(
-            ((0.6 * avg_similarity) +
-             (0.4 * consistency)) * 100,
+
+            (
+                (0.6 * avg_similarity) +
+                (0.4 * consistency)
+            ) * 100,
+
             1
         )
 
@@ -76,29 +94,43 @@ class Router:
         confidence_scores = []
 
         # -----------------------------
-        # 3. RAG Layer
+        # 3. Universal RAG Augmentation
         # -----------------------------
-        if analysis["needs_rag"]:
+        print("[Router] Trying RAG augmentation...")
 
-            print("[Router] Running RAG...")
+        rag_response = self.rag.ask(question)
 
-            rag_response = self.rag.ask(question)
+        rag_context = (
+            rag_response.get("context", "")
+        )
 
-            if rag_response["context"].strip():
+        if rag_context.strip():
 
-                contexts.append(
-                    f"RAG INFORMATION:\n{rag_response['context']}"
-                )
+            print(
+                "[Router] RAG context added"
+            )
 
-                rag_confidence = self.calculate_confidence(
+            contexts.append(
+
+                f"RAG CONTEXT:\n"
+                f"{rag_context}"
+            )
+
+            rag_confidence = (
+                self.calculate_confidence(
                     rag_response.get("distances")
                 )
+            )
 
-                confidence_scores.append(rag_confidence)
+            confidence_scores.append(
+                rag_confidence
+            )
 
-            else:
+        else:
 
-                print("[Router] Empty RAG context")
+            print(
+                "[Router] No useful RAG context"
+            )
 
         # -----------------------------
         # 4. Market Data Layer
@@ -107,36 +139,55 @@ class Router:
 
             print("[Router] Fetching market data...")
 
-            asset = self.asset_extractor.extract(question)
+            asset = self.asset_extractor.extract(
+                question
+            )
 
-            symbol = asset.get("possible_symbol")
+            symbol = asset.get(
+                "possible_symbol"
+            )
 
             if symbol:
 
-                results = self.market_fetcher.fetch_prices(symbol)
+                results = (
+                    self.market_fetcher
+                    .fetch_prices(symbol)
+                )
 
                 if results:
 
                     price, market_confidence = (
-                        self.market_verifier.verify(results)
+
+                        self.market_verifier
+                        .verify(results)
                     )
 
                     contexts.append(
+
                         f"MARKET DATA:\n"
-                        f"{symbol} current price is ${price}"
+                        f"{symbol} current "
+                        f"price is ${price}"
                     )
 
                     if market_confidence is not None:
 
-                         confidence_scores.append( market_confidence)
+                        confidence_scores.append(
+                            market_confidence
+                        )
 
                 else:
 
-                    print("[Router] Market fetch failed")
+                    print(
+                        "[Router] "
+                        "Market fetch failed"
+                    )
 
             else:
 
-                print("[Router] No symbol detected")
+                print(
+                    "[Router] "
+                    "No symbol detected"
+                )
 
         # -----------------------------
         # 5. Forecast Layer
@@ -148,20 +199,29 @@ class Router:
             if self.forecast_model:
 
                 prediction, prob = (
-                    self.forecast_model.predict(question)
+
+                    self.forecast_model
+                    .predict(question)
                 )
 
                 contexts.append(
-                    f"PREDICTION:\n{prediction}"
+
+                    f"PREDICTION:\n"
+                    f"{prediction}"
                 )
 
-                confidence_scores.append(prob * 100)
+                confidence_scores.append(
+                    prob * 100
+                )
 
             else:
 
                 contexts.append(
+
                     "PREDICTION:\n"
-                    "Forecast model not available yet."
+
+                    "Forecast model "
+                    "not available yet."
                 )
 
         # -----------------------------
@@ -171,10 +231,12 @@ class Router:
 
             print("[Router] Running news analysis...")
 
-            # Placeholder for future News AI
             contexts.append(
+
                 "NEWS ANALYSIS:\n"
-                "News analysis system will be integrated soon."
+
+                "News analysis system "
+                "will be integrated soon."
             )
 
         # -----------------------------
@@ -191,7 +253,9 @@ class Router:
         if fused_context.strip():
 
             final_answer = self.llm.generate(
+
                 question=question,
+
                 context=fused_context
             )
 
@@ -207,8 +271,10 @@ class Router:
         if confidence_scores:
 
             final_confidence = round(
+
                 sum(confidence_scores) /
                 len(confidence_scores),
+
                 1
             )
 

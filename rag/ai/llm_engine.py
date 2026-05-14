@@ -4,30 +4,44 @@ import ollama
 class LLMEngine:
 
     def __init__(self, model="iKhalid/ALLaM:7b"):
+
         self.model = model
 
+    # -----------------------------------
+    # Main Generation Pipeline
+    # -----------------------------------
     def generate(self, question, context=None):
 
         try:
 
-            # -----------------------------
+            # -----------------------------------
             # RAG MODE
-            # -----------------------------
+            # -----------------------------------
             if context and context.strip():
 
                 prompt = f"""
-You are a financial assistant.
+You are a financial AI assistant.
 
-Use ONLY the provided context to answer the question.
+Use the provided context as the primary source of truth.
 
-Rules:
-- Be clear and simple for beginners
-- Answer directly, do not repeat the question
-- If numbers exist → include them exactly
-- Do NOT change financial values
-- If answer is not found → say clearly it's not available
+Instructions:
+- Answer clearly and professionally
+- Keep explanations simple for beginners
+- If financial numbers exist in the context:
+  preserve them exactly
+- Do not change percentages, revenues,
+  prices, or dates
+- Do not invent facts not supported
+  by the context
+- If the context partially answers
+  the question:
+  combine the context with careful
+  general financial knowledge
+- If the answer is completely missing:
+  clearly say the information
+  is not available
 
-Context:
+Retrieved Context:
 {context}
 
 Question:
@@ -36,15 +50,15 @@ Question:
 Answer:
 """
 
-            # -----------------------------
+            # -----------------------------------
             # KNOWLEDGE MODE
-            # -----------------------------
+            # -----------------------------------
             else:
 
                 prompt = f"""
 You are a financial education assistant.
 
-Answer using your knowledge.
+Answer using general financial knowledge.
 
 Rules:
 - Explain clearly and simply
@@ -52,6 +66,7 @@ Rules:
 - Do NOT invent financial numbers
 - Do NOT give financial advice
 - Use financial terms only if needed
+- If unsure, avoid unsupported claims
 
 Question:
 {question}
@@ -59,12 +74,26 @@ Question:
 Answer:
 """
 
+            # -----------------------------------
+            # Generate Response
+            # -----------------------------------
             response = ollama.chat(
+
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}]
+
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
             )
 
             return response["message"]["content"]
 
         except Exception as e:
-            return f"Error generating response: {str(e)}"
+
+            return (
+                f"Error generating response: "
+                f"{str(e)}"
+            )
