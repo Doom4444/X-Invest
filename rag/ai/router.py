@@ -7,6 +7,8 @@ from rag.online.asset_extractor import AssetExtractor
 from rag.online.market_fetcher import MarketFetcher
 from rag.online.market_verifier import MarketVerifier
 
+from rag.core.context_fusion import ContextFusion
+
 
 class Router:
 
@@ -16,6 +18,9 @@ class Router:
         self.analyzer = QueryAnalyzer()
         self.rag = RAGEngine()
         self.llm = LLMEngine()
+
+        # Fusion layer
+        self.fusion = ContextFusion()
 
         # Online market layer
         self.asset_extractor = AssetExtractor()
@@ -89,7 +94,13 @@ class Router:
         # -----------------------------
         # 2. Context containers
         # -----------------------------
-        contexts = []
+        rag_context = ""
+
+        market_context = ""
+
+        news_context = ""
+
+        prediction_context = ""
 
         confidence_scores = []
 
@@ -108,12 +119,6 @@ class Router:
 
             print(
                 "[Router] RAG context added"
-            )
-
-            contexts.append(
-
-                f"RAG CONTEXT:\n"
-                f"{rag_context}"
             )
 
             rag_confidence = (
@@ -162,9 +167,7 @@ class Router:
                         .verify(results)
                     )
 
-                    contexts.append(
-
-                        f"MARKET DATA:\n"
+                    market_context = (
                         f"{symbol} current "
                         f"price is ${price}"
                     )
@@ -204,10 +207,8 @@ class Router:
                     .predict(question)
                 )
 
-                contexts.append(
-
-                    f"PREDICTION:\n"
-                    f"{prediction}"
+                prediction_context = (
+                    prediction
                 )
 
                 confidence_scores.append(
@@ -216,10 +217,7 @@ class Router:
 
             else:
 
-                contexts.append(
-
-                    "PREDICTION:\n"
-
+                prediction_context = (
                     "Forecast model "
                     "not available yet."
                 )
@@ -231,10 +229,7 @@ class Router:
 
             print("[Router] Running news analysis...")
 
-            contexts.append(
-
-                "NEWS ANALYSIS:\n"
-
+            news_context = (
                 "News analysis system "
                 "will be integrated soon."
             )
@@ -242,7 +237,16 @@ class Router:
         # -----------------------------
         # 7. Context Fusion
         # -----------------------------
-        fused_context = "\n\n".join(contexts)
+        fused_context = self.fusion.fuse(
+
+            rag_context=rag_context,
+
+            market_context=market_context,
+
+            news_context=news_context,
+
+            prediction_context=prediction_context
+        )
 
         print("\n[Router] Fused Context:")
         print(fused_context)
