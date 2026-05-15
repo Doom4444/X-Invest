@@ -23,12 +23,95 @@ class NewsFetcher:
         self.timeout = 5
 
     # -----------------------------------
+    # Filter relevant articles
+    # -----------------------------------
+    def filter_articles(
+
+        self,
+
+        articles,
+
+        symbol,
+
+        asset_name=None
+    ):
+
+        filtered = []
+
+        # --------------------------------
+        # Normalize entity names
+        # --------------------------------
+        symbol = (
+            symbol.lower()
+            if symbol
+            else ""
+        )
+
+        asset_name = (
+            asset_name.lower()
+            if asset_name
+            else ""
+        )
+
+        for article in articles:
+
+            headline = article.get(
+                "headline",
+                ""
+            )
+
+            summary = article.get(
+                "summary",
+                ""
+            )
+
+            text = (
+
+                f"{headline} {summary}"
+
+                .lower()
+            )
+
+            # --------------------------------
+            # Entity relevance check
+            # --------------------------------
+            symbol_match = (
+                symbol in text
+            )
+
+            asset_match = (
+                asset_name in text
+            )
+
+            # --------------------------------
+            # Keep only relevant articles
+            # --------------------------------
+            if (
+
+                symbol_match
+
+                or asset_match
+            ):
+
+                filtered.append(
+                    article
+                )
+
+        return filtered
+
+    # -----------------------------------
     # Fetch recent news
     # -----------------------------------
     def fetch_news(
+
         self,
+
         symbol,
+
+        asset_name=None,
+
         days_back=7,
+
         max_articles=5
     ):
 
@@ -91,11 +174,11 @@ class NewsFetcher:
                 return []
 
             # -----------------------------
-            # Clean articles
+            # Clean raw articles
             # -----------------------------
-            articles = []
+            raw_articles = []
 
-            for item in data[:max_articles]:
+            for item in data:
 
                 headline = item.get(
                     "headline",
@@ -120,7 +203,7 @@ class NewsFetcher:
                 if not headline:
                     continue
 
-                articles.append({
+                raw_articles.append({
 
                     "headline": headline,
 
@@ -131,9 +214,32 @@ class NewsFetcher:
                     "url": url
                 })
 
+            # -----------------------------
+            # Filter relevant articles
+            # -----------------------------
+            articles = self.filter_articles(
+
+                raw_articles,
+
+                symbol=symbol,
+
+                asset_name=asset_name
+            )
+
+            # -----------------------------
+            # Limit final results
+            # -----------------------------
+            articles = articles[
+                :max_articles
+            ]
+
             print(
+
                 f"[NewsFetcher] "
-                f"Fetched {len(articles)} articles"
+
+                f"Fetched {len(articles)} "
+
+                f"relevant articles"
             )
 
             return articles
@@ -180,4 +286,3 @@ class NewsFetcher:
             lines.append(text)
 
         return "\n\n".join(lines)
-    

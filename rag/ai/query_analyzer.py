@@ -23,123 +23,173 @@ class QueryAnalyzer:
         # -----------------------------------
         # Semantic threshold
         # -----------------------------------
-        self.semantic_threshold = 0.72
+        self.semantic_threshold = 0.68
 
         # -----------------------------------
-        # Intent examples
+        # Intent Definitions
         # -----------------------------------
-        self.intents = {
+        self.intent_definitions = {
 
             # --------------------------------
             # Market Data
             # --------------------------------
-            "market_data": [
+            "market_data": {
 
-                "tesla live quote",
+                "description":
+                    (
+                        "Questions asking for live financial "
+                        "asset prices, current stock values, "
+                        "real-time cryptocurrency prices, "
+                        "market quotes, trading values, "
+                        "or current market valuation data"
+                    ),
 
-                "bitcoin current quote",
+                "examples": [
 
-                "gold trading at",
+                    "tesla stock price today",
 
-                "apple ticker",
+                    "bitcoin current value",
 
-                "oil live quote"
-            ],
+                    "gold live quote"
+                ]
+            },
 
             # --------------------------------
             # General Finance
             # --------------------------------
-            "general_finance": [
+            "general_finance": {
 
-                "what is diversification",
+                "description":
+                    (
+                        "Educational finance questions asking "
+                        "for explanations of financial concepts, "
+                        "investment terminology, economic definitions, "
+                        "banking concepts, portfolio concepts, "
+                        "or beginner-friendly financial learning"
+                    ),
 
-                "what is investing",
+                "examples": [
 
-                "define portfolio",
+                    "what is inflation",
 
-                "what is inflation",
+                    "difference between stocks and bonds",
 
-                "difference between stocks and bonds",
-
-                "what is cpi",
-
-                "what is monetary policy",
-
-                "what are corporate bonds"
-            ],
+                    "what is diversification"
+                ]
+            },
 
             # --------------------------------
             # Analysis
             # --------------------------------
-            "analysis": [
+            "analysis": {
 
-                "financial report analysis",
+                "description":
+                    (
+                        "Questions about financial reports, "
+                        "economic conditions, company performance, "
+                        "macroeconomic analysis, monetary policy, "
+                        "central bank reports, financial operations, "
+                        "risk discussions, financial statements, "
+                        "or analytical interpretation of financial data"
+                    ),
 
-                "economic outlook",
+                "examples": [
 
-                "company performance",
+                    "what does the report say about inflation",
 
-                "financial statement analysis",
+                    "federal reserve economic outlook",
 
-                "macroeconomic analysis",
-
-                "market analysis",
-
-                "global economy outlook",
-
-                "economic growth risks"
-            ],
+                    "financial performance analysis"
+                ]
+            },
 
             # --------------------------------
             # Forecast
             # --------------------------------
-            "forecast": [
+            "forecast": {
 
-                "predict tesla future trend",
+                "description":
+                    (
+                        "Questions asking about future market expectations, "
+                        "future stock movement, financial forecasting, "
+                        "trend prediction, future asset outlook, "
+                        "or expected future market behavior"
+                    ),
 
-                "future outlook for bitcoin",
+                "examples": [
 
-                "forecast stock movement",
+                    "predict tesla future price",
 
-                "next year market forecast"
-            ],
+                    "future outlook for bitcoin",
+
+                    "forecast stock movement"
+                ]
+            },
 
             # --------------------------------
             # News Analysis
             # --------------------------------
-            "news_analysis": [
+            "news_analysis": {
 
-                "latest bitcoin news",
+                "description":
+                    (
+                        "Questions about recent financial news, "
+                        "breaking economic events, market headlines, "
+                        "recent company news, current market sentiment, "
+                        "or discussions about recent financial events "
+                        "affecting markets or assets"
+                    ),
 
-                "breaking market news",
+                "examples": [
 
-                "why is tesla falling today",
+                    "latest bitcoin news",
 
-                "recent economic news",
+                    "recent market headlines",
 
-                "market headlines"
-            ]
+                    "why is tesla falling today"
+                ]
+            }
         }
 
         # -----------------------------------
-        # Precompute embeddings
+        # Store intent embeddings
         # -----------------------------------
         self.intent_embeddings = {}
 
+        # -----------------------------------
+        # Build embeddings once
+        # -----------------------------------
         self.prepare_intent_embeddings()
 
     # -----------------------------------
-    # Prepare embeddings once
+    # Prepare semantic intent embeddings
     # -----------------------------------
     def prepare_intent_embeddings(self):
 
-        for intent, examples in (
-            self.intents.items()
+        for intent, data in (
+
+            self.intent_definitions.items()
         ):
+
+            texts = []
+
+            # --------------------------------
+            # Description
+            # --------------------------------
+            texts.append(
+                data["description"]
+            )
+
+            # --------------------------------
+            # Examples
+            # --------------------------------
+            texts.extend(
+                data["examples"]
+            )
 
             embeddings = []
 
-            for text in examples:
+            for text in texts:
 
                 emb = ollama.embeddings(
 
@@ -156,18 +206,18 @@ class QueryAnalyzer:
             )
 
     # -----------------------------------
-    # Rule Layer
+    # Lightweight Rules
     # -----------------------------------
     def rule_layer(self, question):
 
         q = question.lower()
 
         # -----------------------------------
-        # Forecast FIRST
+        # Forecast
         # -----------------------------------
         if re.search(
 
-            r"predict|forecast|future outlook|next year",
+            r"\bpredict\b|\bforecast\b",
 
             q
         ):
@@ -179,11 +229,11 @@ class QueryAnalyzer:
             )
 
         # -----------------------------------
-        # News Analysis
+        # Breaking News
         # -----------------------------------
         if re.search(
 
-            r"latest news|breaking news|headline|falling today|dropping today|recent news",
+            r"breaking news|latest headlines",
 
             q
         ):
@@ -194,42 +244,10 @@ class QueryAnalyzer:
                 "rule"
             )
 
-        # -----------------------------------
-        # Market Data
-        # -----------------------------------
-        if re.search(
-
-            r"ticker|live quote|current quote|trading at",
-
-            q
-        ):
-
-            return (
-                "market_data",
-                0.90,
-                "rule"
-            )
-
-        # -----------------------------------
-        # Analysis
-        # -----------------------------------
-        if re.search(
-
-            r"financial report|economic outlook|company performance|market analysis",
-
-            q
-        ):
-
-            return (
-                "analysis",
-                0.90,
-                "rule"
-            )
-
         return None, 0, None
 
     # -----------------------------------
-    # Semantic Layer
+    # Semantic Intent Detection
     # -----------------------------------
     def embedding_layer(self, question):
 
@@ -270,7 +288,7 @@ class QueryAnalyzer:
         return best_intent, best_score
 
     # -----------------------------------
-    # LLM Fallback
+    # LLM fallback
     # -----------------------------------
     def llm_layer(self, question):
 
@@ -279,27 +297,35 @@ Classify the following financial question
 into ONE category.
 
 Categories:
+
 market_data
 general_finance
 analysis
 forecast
 news_analysis
 
-Rules:
-- market_data:
-  live prices and current values
+Category meanings:
 
-- general_finance:
-  educational concepts
+market_data:
+Questions asking for live prices,
+market values, or trading information.
 
-- analysis:
-  reports and financial discussions
+general_finance:
+Educational financial explanations
+and beginner-friendly concepts.
 
-- forecast:
-  future predictions
+analysis:
+Financial reports, economic analysis,
+financial discussions, risk analysis,
+and company/economic interpretation.
 
-- news_analysis:
-  recent events and news
+forecast:
+Future predictions, trend expectations,
+and future market outlooks.
+
+news_analysis:
+Recent financial news, headlines,
+market sentiment, and current events.
 
 Return ONLY the category name.
 
@@ -330,7 +356,7 @@ Question:
         )
 
     # -----------------------------------
-    # Routing Metadata
+    # Build routing metadata
     # -----------------------------------
     def build_metadata(
 
@@ -364,7 +390,7 @@ Question:
         }
 
         # -----------------------------------
-        # Intent Routing
+        # Routing Logic
         # -----------------------------------
         if intent == "forecast":
 
@@ -388,10 +414,6 @@ Question:
                 "needs_news"
             ] = True
 
-            metadata[
-                "needs_market_data"
-            ] = True
-
         elif intent == "general_finance":
 
             metadata[
@@ -411,12 +433,12 @@ Question:
         return metadata
 
     # -----------------------------------
-    # Main Analyzer
+    # Main Pipeline
     # -----------------------------------
     def analyze(self, question):
 
         # -----------------------------------
-        # 1. Rule Layer
+        # 1. Rules
         # -----------------------------------
         intent, confidence, method = (
 
@@ -452,7 +474,7 @@ Question:
             f"{round(score, 3)}"
         )
 
-        if score > self.semantic_threshold:
+        if score >= self.semantic_threshold:
 
             print(
                 "[Analyzer] Semantic match"
@@ -468,7 +490,7 @@ Question:
             )
 
         # -----------------------------------
-        # 3. LLM Fallback
+        # 3. LLM fallback
         # -----------------------------------
         print(
             "[Analyzer] Fallback to LLM"

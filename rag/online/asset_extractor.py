@@ -156,6 +156,67 @@ class AssetExtractor:
         return None
 
     # -----------------------------------
+    # Clean JSON Text
+    # -----------------------------------
+    def clean_json_response(self, text):
+
+        # --------------------------------
+        # Remove markdown formatting
+        # --------------------------------
+        text = re.sub(
+
+            r"```json|```",
+
+            "",
+
+            text
+        ).strip()
+
+        # --------------------------------
+        # Extract JSON block only
+        # --------------------------------
+        match = re.search(
+
+            r"\{.*\}",
+
+            text,
+
+            re.DOTALL
+        )
+
+        if match:
+
+            return match.group()
+
+        return text
+
+    # -----------------------------------
+    # Validate JSON Structure
+    # -----------------------------------
+    def validate_response(self, data):
+
+        required_keys = [
+
+            "asset_name",
+
+            "asset_type",
+
+            "possible_symbol"
+        ]
+
+        if not isinstance(data, dict):
+
+            return False
+
+        for key in required_keys:
+
+            if key not in data:
+
+                return False
+
+        return True
+
+    # -----------------------------------
     # LLM Fallback Extraction
     # -----------------------------------
     def llm_extract(self, question):
@@ -208,23 +269,23 @@ Question:
             )
 
             # --------------------------------
-            # Remove markdown formatting
+            # Clean model response
             # --------------------------------
-            text = re.sub(
-
-                r"```json|```",
-
-                "",
-
+            text = self.clean_json_response(
                 text
-            ).strip()
+            )
 
+            # --------------------------------
+            # Parse JSON
+            # --------------------------------
             data = json.loads(text)
 
             # --------------------------------
             # Validate output
             # --------------------------------
-            if not isinstance(data, dict):
+            if not self.validate_response(
+                data
+            ):
 
                 raise ValueError(
                     "Invalid JSON structure"

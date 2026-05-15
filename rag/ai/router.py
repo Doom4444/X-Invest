@@ -53,37 +53,60 @@ class Router:
         self.forecast_model = None
 
     # -----------------------------------
-    # Confidence calculation
+    # RAG confidence calculation
     # -----------------------------------
-    def calculate_confidence(self, distances):
+    def calculate_confidence(
 
+        self,
+
+        distances,
+
+        analyzer_confidence=0.65
+    ):
+
+        # -----------------------------------
+        # No retrieval
+        # -----------------------------------
         if not distances:
 
-            return 70.0
+            return round(
+                analyzer_confidence * 100,
+                1
+            )
 
         similarities = []
 
         for d in distances:
 
-            similarity = (
-                1 / (1 + abs(d))
+            # --------------------------------
+            # Cosine similarity
+            # --------------------------------
+            similarity = max(
+                0,
+                1 - d
             )
 
             similarities.append(
                 similarity
             )
 
+        # -----------------------------------
+        # Average similarity
+        # -----------------------------------
         avg_similarity = (
 
             sum(similarities) /
             len(similarities)
         )
 
+        # -----------------------------------
+        # Strong retrieval consistency
+        # -----------------------------------
         strong_matches = [
 
             s for s in similarities
 
-            if s > 0.75
+            if s >= 0.70
         ]
 
         consistency = (
@@ -92,17 +115,128 @@ class Router:
             len(similarities)
         )
 
-        confidence = round(
+        # -----------------------------------
+        # Retrieval confidence
+        # -----------------------------------
+        retrieval_confidence = (
 
-            (
-                (0.6 * avg_similarity) +
-                (0.4 * consistency)
-            ) * 100,
+            (0.7 * avg_similarity) +
 
+            (0.3 * consistency)
+        )
+
+        # -----------------------------------
+        # Final fusion
+        # -----------------------------------
+        final_confidence = (
+
+            (0.35 * analyzer_confidence) +
+
+            (0.65 * retrieval_confidence)
+        )
+
+        return round(
+            final_confidence * 100,
             1
         )
 
-        return confidence
+    # -----------------------------------
+    # Weighted confidence fusion
+    # -----------------------------------
+    def fuse_confidence(
+
+        self,
+
+        analyzer_confidence=None,
+
+        rag_confidence=None,
+
+        market_confidence=None,
+
+        news_confidence=None,
+
+        prediction_confidence=None
+    ):
+
+        weighted_scores = []
+
+        total_weight = 0
+
+        # -----------------------------------
+        # RAG confidence
+        # -----------------------------------
+        if rag_confidence is not None:
+
+            weighted_scores.append(
+                rag_confidence * 0.50
+            )
+
+            total_weight += 0.50
+
+        # -----------------------------------
+        # Analyzer confidence
+        # -----------------------------------
+        if analyzer_confidence is not None:
+
+            weighted_scores.append(
+                analyzer_confidence * 0.20
+            )
+
+            total_weight += 0.20
+
+        # -----------------------------------
+        # Market confidence
+        # -----------------------------------
+        if market_confidence is not None:
+
+            weighted_scores.append(
+                market_confidence * 0.20
+            )
+
+            total_weight += 0.20
+
+        # -----------------------------------
+        # News confidence
+        # -----------------------------------
+        if news_confidence is not None:
+
+            weighted_scores.append(
+                news_confidence * 0.10
+            )
+
+            total_weight += 0.10
+
+        # -----------------------------------
+        # Prediction confidence
+        # -----------------------------------
+        if prediction_confidence is not None:
+
+            weighted_scores.append(
+                prediction_confidence * 0.15
+            )
+
+            total_weight += 0.15
+
+        # -----------------------------------
+        # No confidence available
+        # -----------------------------------
+        if total_weight == 0:
+
+            return 65.0
+
+        # -----------------------------------
+        # Final normalized confidence
+        # -----------------------------------
+        final_confidence = (
+
+            sum(weighted_scores) /
+            total_weight
+        )
+
+        return round(
+            final_confidence,
+            1
+        )
 
     # -----------------------------------
     # Main routing pipeline
@@ -156,7 +290,16 @@ class Router:
 
         prediction_context = ""
 
-        confidence_scores = []
+        # -----------------------------------
+        # Confidence containers
+        # -----------------------------------
+        rag_confidence = None
+
+        market_confidence = None
+
+        news_confidence = None
+
+        prediction_confidence = None
 
         # -----------------------------------
         # 4. Conditional RAG
@@ -188,14 +331,22 @@ class Router:
                 rag_confidence = (
 
                     self.calculate_confidence(
+
                         rag_response.get(
                             "distances"
-                        )
+                        ),
+
+                        analysis["confidence"]
                     )
                 )
 
-                confidence_scores.append(
-                    rag_confidence
+                print(
+
+                    f"[Router] "
+
+                    f"RAG confidence: "
+
+                    f"{rag_confidence}%"
                 )
 
             else:
@@ -237,12 +388,6 @@ class Router:
                         f"price is ${price}"
                     )
 
-                    if market_confidence is not None:
-
-                        confidence_scores.append(
-                            market_confidence
-                        )
-
                 else:
 
                     print(
@@ -279,7 +424,7 @@ class Router:
                     prediction
                 )
 
-                confidence_scores.append(
+                prediction_confidence = (
                     prob * 100
                 )
 
@@ -349,9 +494,9 @@ class Router:
                 )
 
                 # -----------------------------
-                # Add confidence
+                # Store confidence
                 # -----------------------------
-                confidence_scores.append(
+                news_confidence = (
 
                     sentiment_data[
                         "confidence"
@@ -404,19 +549,34 @@ class Router:
         # -----------------------------------
         # 10. Final Confidence
         # -----------------------------------
-        if confidence_scores:
+        final_confidence = (
 
-            final_confidence = round(
+            self.fuse_confidence(
 
-                sum(confidence_scores) /
-                len(confidence_scores),
+                analyzer_confidence=(
 
-                1
+                    analysis["confidence"]
+                    * 100
+                ),
+
+                rag_confidence=(
+                    rag_confidence
+                ),
+
+                market_confidence=(
+                    market_confidence
+                ),
+
+                news_confidence=(
+                    news_confidence
+                ),
+
+                prediction_confidence=(
+
+                    prediction_confidence
+                )
             )
-
-        else:
-
-            final_confidence = 65.0
+        )
 
         # -----------------------------------
         # 11. Return response

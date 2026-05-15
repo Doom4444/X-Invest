@@ -1,5 +1,7 @@
 import re
 
+from rank_bm25 import BM25Okapi
+
 from rag.core.vector_store import VectorStore
 
 
@@ -10,84 +12,125 @@ class Retriever:
         self.vector_store = VectorStore()
 
     # -----------------------------------
-    # Keyword overlap score
+    # Tokenize text
     # -----------------------------------
-    def keyword_score(
+    def tokenize(
         self,
-        query,
-        document
+        text
     ):
 
-        query_words = set(
-
-            re.findall(
-                r"\w+",
-                query.lower()
-            )
+        return re.findall(
+            r"\w+",
+            text.lower()
         )
-
-        doc_words = set(
-
-            re.findall(
-                r"\w+",
-                document.lower()
-            )
-        )
-
-        overlap = (
-            query_words & doc_words
-        )
-
-        return len(overlap)
 
     # -----------------------------------
-    # Lightweight reranking
+    # BM25 Scoring
+    # -----------------------------------
+    def bm25_scores(
+
+        self,
+
+        query,
+
+        documents
+    ):
+
+        tokenized_docs = [
+
+            self.tokenize(doc)
+
+            for doc in documents
+        ]
+
+        bm25 = BM25Okapi(
+            tokenized_docs
+        )
+
+        tokenized_query = (
+            self.tokenize(query)
+        )
+
+        scores = bm25.get_scores(
+            tokenized_query
+        )
+
+        # --------------------------------
+        # Normalize scores
+        # --------------------------------
+        max_score = max(scores)
+
+        if max_score == 0:
+
+            return [0] * len(scores)
+
+        normalized_scores = [
+
+            s / max_score
+
+            for s in scores
+        ]
+
+        return normalized_scores
+
+    # -----------------------------------
+    # Hybrid reranking
     # -----------------------------------
     def rerank(
+
         self,
+
         query,
+
         documents,
+
         distances
     ):
 
         reranked = []
 
-        for doc, dist in zip(
+        # --------------------------------
+        # BM25 scores
+        # --------------------------------
+        bm25_scores = self.bm25_scores(
+
+            query,
+
+            documents
+        )
+
+        for (
+            doc,
+            dist,
+            bm25_score
+
+        ) in zip(
+
             documents,
-            distances
+
+            distances,
+
+            bm25_scores
         ):
 
             # --------------------------------
             # Cosine similarity conversion
             # --------------------------------
-            similarity = max(
+            semantic_similarity = max(
+
                 0,
+
                 1 - dist
             )
 
             # --------------------------------
-            # Keyword overlap
-            # --------------------------------
-            keyword_overlap = (
-                self.keyword_score(
-                    query,
-                    doc
-                )
-            )
-
-            keyword_overlap = min(
-                keyword_overlap / 10,
-                1
-            )
-
-            # --------------------------------
-            # Final score
+            # Hybrid final score
             # --------------------------------
             final_score = (
 
-                (0.75 * similarity) +
+                (0.70 * semantic_similarity) +
 
-                (0.25 * keyword_overlap)
+                (0.30 * bm25_score)
             )
 
             reranked.append({
@@ -96,9 +139,14 @@ class Retriever:
 
                 "distance": dist,
 
-                "similarity": similarity,
+                "semantic_similarity":
+                    semantic_similarity,
 
-                "score": final_score
+                "bm25_score":
+                    bm25_score,
+
+                "score":
+                    final_score
             })
 
         # -----------------------------------
@@ -127,15 +175,107 @@ class Retriever:
 
         similarities = [
 
-            item["similarity"]
+            item["semantic_similarity"]
 
             for item in reranked
         ]
 
         return (
+
             documents,
+
             distances,
+
             similarities
+        )
+
+    # -----------------------------------
+    # Remove duplicate chunks
+    # -----------------------------------
+    def deduplicate(
+
+        self,
+
+        documents,
+
+        distances,
+
+        similarity_threshold=0.90
+    ):
+
+        unique_documents = []
+
+        unique_distances = []
+
+        for doc, dist in zip(
+            documents,
+            distances
+        ):
+
+            is_duplicate = False
+
+            current_words = set(
+
+                self.tokenize(doc)
+            )
+
+            for existing_doc in unique_documents:
+
+                existing_words = set(
+
+                    self.tokenize(
+                        existing_doc
+                    )
+                )
+
+                # ----------------------------
+                # Jaccard similarity
+                # ----------------------------
+                intersection = len(
+
+                    current_words &
+                    existing_words
+                )
+
+                union = len(
+
+                    current_words |
+                    existing_words
+                )
+
+                if union == 0:
+
+                    continue
+
+                similarity = (
+                    intersection / union
+                )
+
+                # ----------------------------
+                # Duplicate detected
+                # ----------------------------
+                if similarity >= similarity_threshold:
+
+                    is_duplicate = True
+
+                    break
+
+            # ----------------------------
+            # Keep unique chunk
+            # ----------------------------
+            if not is_duplicate:
+
+                unique_documents.append(
+                    doc
+                )
+
+                unique_distances.append(
+                    dist
+                )
+
+        return (
+            unique_documents,
+            unique_distances
         )
 
     # -----------------------------------
@@ -211,7 +351,7 @@ class Retriever:
                 return [], []
 
             # --------------------------------
-            # Reranking
+            # Hybrid reranking
             # --------------------------------
             (
                 reranked_documents,
@@ -276,6 +416,31 @@ class Retriever:
                 )
 
                 return [], []
+
+            # --------------------------------
+            # Deduplicate chunks
+            # --------------------------------
+            (
+                final_documents,
+                final_distances
+
+            ) = self.deduplicate(
+
+                final_documents,
+
+                final_distances,
+
+                similarity_threshold=0.90
+            )
+
+            print(
+
+                f"[Retriever] "
+
+                f"Final unique chunks: "
+
+                f"{len(final_documents)}"
+            )
 
             # --------------------------------
             # Return top_k
