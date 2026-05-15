@@ -3,95 +3,229 @@ from rag.ai.router import Router
 
 router = Router()
 
-questions = [
 
-    # -----------------------------
-    # Investing Basics
-    # -----------------------------
-    "What is diversification?",
+# ===================================
+# Structured Test Cases
+# ===================================
+TEST_CASES = {
 
-    "Why is diversification important for investors?",
+    # -----------------------------------
+    # General Finance + RAG
+    # -----------------------------------
+    "general_finance": [
 
-    "What are the keys to financial success?",
+        "What is diversification?",
 
-    # -----------------------------
-    # Inflation
-    # -----------------------------
-    "What is inflation?",
+        "Why is diversification important for investors?",
 
-    "How is inflation measured?",
+        "What is inflation?",
 
-    "What is CPI?",
+        "How is inflation measured using CPI?",
 
-    # -----------------------------
-    # Bonds
-    # -----------------------------
-    "What are corporate bonds?",
+        "What is the Consumer Price Index?",
 
-    "What is default risk in bonds?",
+        "What is core inflation?",
 
-    "Difference between stocks and bonds",
+        "What are corporate bonds?",
 
-    # -----------------------------
-    # Federal Reserve
-    # -----------------------------
-    "What does the Federal Reserve do?",
+        "What is default risk in bonds?",
 
-    "What is monetary policy?",
+        "Difference between stocks and corporate bonds",
 
-    "How does the Fed control inflation?",
+        "What are investment-grade bonds?",
 
-    # -----------------------------
+        "Why do long-term bonds usually offer higher interest rates?",
+
+        "Why is saving and investing important?",
+
+        "How can investing help achieve financial security?",
+
+        "What questions should investors ask financial professionals?"
+    ],
+
+    # -----------------------------------
+    # Federal Reserve / Monetary Policy
+    # -----------------------------------
+    "fed_and_policy": [
+
+        "What are the main functions of the Federal Reserve?",
+
+        "What is monetary policy?",
+
+        "How does the Federal Reserve conduct monetary policy?",
+
+        "What are the Federal Reserve's key responsibilities?",
+
+        "What does the Fed do to maintain financial stability?",
+
+        "What does the Monetary Policy Report say about inflation?",
+
+        "What does the Federal Reserve say about labor markets?",
+
+        "What are the recent economic developments discussed in the report?"
+    ],
+
+    # -----------------------------------
+    # OECD / Macroeconomics
+    # -----------------------------------
+    "macroeconomics": [
+
+        "What does the OECD report say about global GDP growth in 2025?",
+
+        "What are the risks facing the global economy according to OECD?",
+
+        "How does the OECD describe trade policy uncertainty?",
+
+        "What does OECD say about inflation trends?",
+
+        "Why does OECD believe global growth is fragile?"
+    ],
+
+    # -----------------------------------
+    # WIPO Financial Report
+    # -----------------------------------
+    "financial_reports": [
+
+        "What happened to WIPO financial performance in 2020?",
+
+        "How did COVID-19 affect WIPO financial operations?",
+
+        "What financial risks were discussed in the WIPO report?"
+    ],
+
+    # -----------------------------------
     # Market Data
-    # -----------------------------
-    "What is Tesla stock price today?",
+    # -----------------------------------
+    "market_data": [
 
-    "Bitcoin price now",
+        "What is Tesla stock price today?",
 
-    "Gold price today",
+        "Bitcoin price now",
 
-    # -----------------------------
+        "Gold price today",
+
+        "Current Apple stock price",
+
+        "Latest oil price"
+    ],
+
+    # -----------------------------------
     # Forecast
-    # -----------------------------
-    "Predict Tesla future stock price",
+    # -----------------------------------
+    "forecast": [
 
-    # -----------------------------
-    # Macroeconomics
-    # -----------------------------
-    "What does the OECD say about global growth?",
+        "Predict Tesla future stock price",
 
-    "What are the risks facing the global economy?",
+        "Forecast Bitcoin next year",
 
-    # -----------------------------
-    # Financial Reports
-    # -----------------------------
-    "What happened to WIPO financial performance in 2020?"
-]
+        "Future outlook for oil prices"
+    ],
 
-for q in questions:
+    # -----------------------------------
+    # News Analysis
+    # -----------------------------------
+    "news_analysis": [
 
-    print("\n" + "=" * 70)
+        "Why is Tesla stock falling today?",
 
-    print(f"QUESTION: {q}")
+        "Latest Bitcoin news",
 
-    print("=" * 70)
+        "What is affecting oil prices recently?",
 
-    try:
+        "Recent market news about Apple"
+    ],
 
-        result = router.route(q)
+    # -----------------------------------
+    # Edge Cases
+    # -----------------------------------
+    "edge_cases": [
 
-        print("\nANSWER:\n")
+        "What is ABCXYZ coin price?",
 
-        print(result.get("answer"))
+        "Predict unknown asset future",
 
-        print("\nCONFIDENCE:")
+        "Latest news about random company",
 
-        print(result.get("confidence"))
+        "Tell me about some unknown economy",
 
-        print("\nINTENT:")
+        "What is the price of random asset XYZ?"
+    ]
+}
 
-        print(result.get("intent"))
 
-    except Exception as e:
+# ===================================
+# Run All Tests
+# ===================================
+for category, questions in TEST_CASES.items():
 
-        print(f"\n[ERROR] {e}")
+    print("\n" + "#" * 80)
+
+    print(
+        f"TEST CATEGORY: "
+        f"{category.upper()}"
+    )
+
+    print("#" * 80)
+
+    for q in questions:
+
+        print("\n" + "=" * 70)
+
+        print(f"QUESTION: {q}")
+
+        print("=" * 70)
+
+        try:
+
+            result = router.route(q)
+
+            print("\nANSWER:\n")
+
+            print(
+                result.get("answer")
+            )
+
+            print("\nCONFIDENCE:")
+
+            print(
+                result.get("confidence")
+            )
+
+            print("\nINTENT:")
+
+            print(
+                result.get("intent")
+            )
+
+            context = result.get(
+                "context",
+                ""
+            )
+
+            print("\nCONTEXT LENGTH:")
+
+            print(len(context))
+
+            print("\nCONTEXT PREVIEW:\n")
+
+            preview = context[:500]
+
+            print(preview)
+
+            if len(context) > 500:
+
+                print(
+                    "\n...[TRUNCATED]..."
+                )
+
+        except KeyboardInterrupt:
+
+            print(
+                "\n[STOPPED BY USER]"
+            )
+
+            exit()
+
+        except Exception as e:
+
+            print(f"\n[ERROR] {e}")

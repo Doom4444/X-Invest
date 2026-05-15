@@ -57,16 +57,17 @@ class Retriever:
             distances
         ):
 
-            # -----------------------------
-            # Embedding similarity
-            # -----------------------------
-            similarity = (
-                1 / (1 + dist)
+            # --------------------------------
+            # Cosine similarity conversion
+            # --------------------------------
+            similarity = max(
+                0,
+                1 - dist
             )
 
-            # -----------------------------
+            # --------------------------------
             # Keyword overlap
-            # -----------------------------
+            # --------------------------------
             keyword_overlap = (
                 self.keyword_score(
                     query,
@@ -74,20 +75,19 @@ class Retriever:
                 )
             )
 
-            # normalize overlap
             keyword_overlap = min(
                 keyword_overlap / 10,
                 1
             )
 
-            # -----------------------------
+            # --------------------------------
             # Final score
-            # -----------------------------
+            # --------------------------------
             final_score = (
 
-                (0.7 * similarity) +
+                (0.75 * similarity) +
 
-                (0.3 * keyword_overlap)
+                (0.25 * keyword_overlap)
             )
 
             reranked.append({
@@ -96,10 +96,14 @@ class Retriever:
 
                 "distance": dist,
 
+                "similarity": similarity,
+
                 "score": final_score
             })
 
-        # sort descending
+        # -----------------------------------
+        # Sort descending
+        # -----------------------------------
         reranked.sort(
 
             key=lambda x: x["score"],
@@ -121,7 +125,18 @@ class Retriever:
             for item in reranked
         ]
 
-        return documents, distances
+        similarities = [
+
+            item["similarity"]
+
+            for item in reranked
+        ]
+
+        return (
+            documents,
+            distances,
+            similarities
+        )
 
     # -----------------------------------
     # Retrieve relevant documents
@@ -134,14 +149,14 @@ class Retriever:
 
         try:
 
-            # -----------------------------
+            # --------------------------------
             # Vector search
-            # -----------------------------
+            # --------------------------------
             results = self.vector_store.search(
 
                 query,
 
-                top_k * 2
+                top_k * 3
             )
 
             documents = (
@@ -158,9 +173,9 @@ class Retriever:
                 )[0]
             )
 
-            # -----------------------------
+            # --------------------------------
             # Clean invalid docs
-            # -----------------------------
+            # --------------------------------
             clean_documents = []
 
             clean_distances = []
@@ -170,35 +185,106 @@ class Retriever:
                 distances
             ):
 
-                if doc and doc.strip():
+                if (
+                    doc and
+                    doc.strip()
+                ):
 
-                    clean_documents.append(doc)
+                    clean_documents.append(
+                        doc
+                    )
 
-                    clean_distances.append(dist)
+                    clean_distances.append(
+                        dist
+                    )
 
-            # -----------------------------
-            # Reranking
-            # -----------------------------
-            reranked_documents, reranked_distances = (
+            # --------------------------------
+            # Empty retrieval
+            # --------------------------------
+            if not clean_documents:
 
-                self.rerank(
-
-                    query,
-
-                    clean_documents,
-
-                    clean_distances
+                print(
+                    "[Retriever] "
+                    "No documents found"
                 )
+
+                return [], []
+
+            # --------------------------------
+            # Reranking
+            # --------------------------------
+            (
+                reranked_documents,
+                reranked_distances,
+                reranked_similarities
+
+            ) = self.rerank(
+
+                query,
+
+                clean_documents,
+
+                clean_distances
             )
 
-            # -----------------------------
-            # Return final top_k
-            # -----------------------------
+            # --------------------------------
+            # Confidence filtering
+            # --------------------------------
+            final_documents = []
+
+            final_distances = []
+
+            for doc, dist, sim in zip(
+
+                reranked_documents,
+
+                reranked_distances,
+
+                reranked_similarities
+            ):
+
+                print(
+
+                    f"[Retriever] "
+
+                    f"Distance: {round(dist, 3)} | "
+
+                    f"Similarity: {round(sim, 3)}"
+                )
+
+                # --------------------------------
+                # Realistic threshold
+                # --------------------------------
+                if sim >= 0.55:
+
+                    final_documents.append(
+                        doc
+                    )
+
+                    final_distances.append(
+                        dist
+                    )
+
+            # --------------------------------
+            # Final fallback
+            # --------------------------------
+            if not final_documents:
+
+                print(
+                    "[Retriever] "
+                    "No relevant chunks"
+                )
+
+                return [], []
+
+            # --------------------------------
+            # Return top_k
+            # --------------------------------
             return (
 
-                reranked_documents[:top_k],
+                final_documents[:top_k],
 
-                reranked_distances[:top_k]
+                final_distances[:top_k]
             )
 
         except Exception as e:

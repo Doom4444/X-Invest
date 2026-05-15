@@ -9,45 +9,136 @@ class AssetExtractor:
 
         self.model = "iKhalid/ALLaM:7b"
 
-        # -----------------------------
+        # -----------------------------------
         # Known assets dictionary
-        # -----------------------------
+        # -----------------------------------
         self.known_assets = {
 
+            # --------------------------------
             # Stocks
-            "tesla": ("Tesla", "stock", "TSLA"),
-            "apple": ("Apple", "stock", "AAPL"),
-            "microsoft": ("Microsoft", "stock", "MSFT"),
-            "amazon": ("Amazon", "stock", "AMZN"),
-            "google": ("Google", "stock", "GOOGL"),
-            "meta": ("Meta", "stock", "META"),
-            "nvidia": ("NVIDIA", "stock", "NVDA"),
+            # --------------------------------
+            "tesla": (
+                "Tesla",
+                "stock",
+                "TSLA"
+            ),
 
+            "apple": (
+                "Apple",
+                "stock",
+                "AAPL"
+            ),
+
+            "microsoft": (
+                "Microsoft",
+                "stock",
+                "MSFT"
+            ),
+
+            "amazon": (
+                "Amazon",
+                "stock",
+                "AMZN"
+            ),
+
+            "google": (
+                "Google",
+                "stock",
+                "GOOGL"
+            ),
+
+            "meta": (
+                "Meta",
+                "stock",
+                "META"
+            ),
+
+            "nvidia": (
+                "NVIDIA",
+                "stock",
+                "NVDA"
+            ),
+
+            # --------------------------------
             # Crypto
-            "bitcoin": ("Bitcoin", "crypto", "BTC"),
-            "btc": ("Bitcoin", "crypto", "BTC"),
-            "ethereum": ("Ethereum", "crypto", "ETH"),
-            "eth": ("Ethereum", "crypto", "ETH"),
+            # --------------------------------
+            "bitcoin": (
+                "Bitcoin",
+                "crypto",
+                "BTC-USD"
+            ),
 
+            "btc": (
+                "Bitcoin",
+                "crypto",
+                "BTC-USD"
+            ),
+
+            "ethereum": (
+                "Ethereum",
+                "crypto",
+                "ETH-USD"
+            ),
+
+            "eth": (
+                "Ethereum",
+                "crypto",
+                "ETH-USD"
+            ),
+
+            # --------------------------------
             # Commodities
-            "gold": ("Gold", "commodity", "XAUUSD"),
-            "silver": ("Silver", "commodity", "XAGUSD"),
-            "oil": ("Oil", "commodity", "CL"),
+            # --------------------------------
+            "gold": (
+                "Gold",
+                "commodity",
+                "GC=F"
+            ),
 
+            "silver": (
+                "Silver",
+                "commodity",
+                "SI=F"
+            ),
+
+            "oil": (
+                "Oil",
+                "commodity",
+                "CL=F"
+            ),
+
+            # --------------------------------
             # Forex
-            "eurusd": ("EUR/USD", "forex", "EURUSD"),
-            "usdjpy": ("USD/JPY", "forex", "USDJPY"),
-            "usd/jpy": ("USD/JPY", "forex", "USDJPY")
+            # --------------------------------
+            "eurusd": (
+                "EUR/USD",
+                "forex",
+                "EUR/USD"
+            ),
+
+            "usdjpy": (
+                "USD/JPY",
+                "forex",
+                "USD/JPY"
+            ),
+
+            "usd/jpy": (
+                "USD/JPY",
+                "forex",
+                "USD/JPY"
+            )
         }
 
-    # -----------------------------
+    # -----------------------------------
     # Rule-based Extraction
-    # -----------------------------
+    # -----------------------------------
     def rule_extract(self, question):
 
         q = question.lower()
 
-        for key, value in self.known_assets.items():
+        for key, value in (
+            self.known_assets.items()
+        ):
 
             if key in q:
 
@@ -64,9 +155,9 @@ class AssetExtractor:
 
         return None
 
-    # -----------------------------
+    # -----------------------------------
     # LLM Fallback Extraction
-    # -----------------------------
+    # -----------------------------------
     def llm_extract(self, question):
 
         prompt = f"""
@@ -81,6 +172,15 @@ Format:
   "possible_symbol": "..."
 }}
 
+Rules:
+- Use real market symbols
+- For Bitcoin use BTC-USD
+- For Ethereum use ETH-USD
+- For Gold use GC=F
+- For Oil use CL=F
+- If unknown:
+  set fields to null
+
 Question:
 {question}
 """
@@ -88,8 +188,11 @@ Question:
         try:
 
             response = ollama.chat(
+
                 model=self.model,
+
                 messages=[
+
                     {
                         "role": "user",
                         "content": prompt
@@ -98,19 +201,38 @@ Question:
             )
 
             text = (
+
                 response["message"]["content"]
+
                 .strip()
             )
 
+            # --------------------------------
             # Remove markdown formatting
+            # --------------------------------
             text = re.sub(
+
                 r"```json|```",
+
                 "",
+
                 text
             ).strip()
 
             data = json.loads(text)
 
+            # --------------------------------
+            # Validate output
+            # --------------------------------
+            if not isinstance(data, dict):
+
+                raise ValueError(
+                    "Invalid JSON structure"
+                )
+
+            # --------------------------------
+            # Add metadata
+            # --------------------------------
             data["method"] = "llm"
 
             return data
@@ -118,7 +240,9 @@ Question:
         except Exception as e:
 
             print(
+
                 "[AssetExtractor] "
+
                 f"LLM extraction failed: {e}"
             )
 
@@ -133,13 +257,17 @@ Question:
                 "method": "failed"
             }
 
-    # -----------------------------
+    # -----------------------------------
     # Main Extraction Pipeline
-    # -----------------------------
+    # -----------------------------------
     def extract(self, question):
 
+        # --------------------------------
         # 1. Rule-based extraction
-        result = self.rule_extract(question)
+        # --------------------------------
+        result = self.rule_extract(
+            question
+        )
 
         if result:
 
@@ -149,10 +277,16 @@ Question:
 
             return result
 
+        # --------------------------------
         # 2. LLM fallback
+        # --------------------------------
         print(
+
             "[AssetExtractor] "
+
             "Using LLM fallback"
         )
 
-        return self.llm_extract(question)
+        return self.llm_extract(
+            question
+        )

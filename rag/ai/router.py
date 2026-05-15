@@ -7,6 +7,9 @@ from rag.online.asset_extractor import AssetExtractor
 from rag.online.market_fetcher import MarketFetcher
 from rag.online.market_verifier import MarketVerifier
 
+from rag.online.news_fetcher import NewsFetcher
+from rag.online.news_analyzer import NewsAnalyzer
+
 from rag.core.context_fusion import ContextFusion
 
 
@@ -14,24 +17,40 @@ class Router:
 
     def __init__(self):
 
+        # -----------------------------------
         # Core systems
+        # -----------------------------------
         self.analyzer = QueryAnalyzer()
+
         self.rag = RAGEngine()
+
         self.llm = LLMEngine()
 
+        # -----------------------------------
         # Fusion layer
+        # -----------------------------------
         self.fusion = ContextFusion()
 
-        # Online market layer
+        # -----------------------------------
+        # Market systems
+        # -----------------------------------
         self.asset_extractor = AssetExtractor()
+
         self.market_fetcher = MarketFetcher()
+
         self.market_verifier = MarketVerifier()
 
-        # Forecast placeholder
-        self.forecast_model = None
+        # -----------------------------------
+        # News systems
+        # -----------------------------------
+        self.news_fetcher = NewsFetcher()
 
-        # News placeholder
-        self.news_system = None
+        self.news_analyzer = NewsAnalyzer()
+
+        # -----------------------------------
+        # Forecast placeholder
+        # -----------------------------------
+        self.forecast_model = None
 
     # -----------------------------------
     # Confidence calculation
@@ -39,17 +58,23 @@ class Router:
     def calculate_confidence(self, distances):
 
         if not distances:
+
             return 70.0
 
         similarities = []
 
         for d in distances:
 
-            similarity = 1 / (1 + d)
+            similarity = (
+                1 / (1 + abs(d))
+            )
 
-            similarities.append(similarity)
+            similarities.append(
+                similarity
+            )
 
         avg_similarity = (
+
             sum(similarities) /
             len(similarities)
         )
@@ -62,6 +87,7 @@ class Router:
         ]
 
         consistency = (
+
             len(strong_matches) /
             len(similarities)
         )
@@ -83,17 +109,45 @@ class Router:
     # -----------------------------------
     def route(self, question):
 
-        # -----------------------------
+        # -----------------------------------
         # 1. Analyze question
-        # -----------------------------
-        analysis = self.analyzer.analyze(question)
+        # -----------------------------------
+        analysis = self.analyzer.analyze(
+            question
+        )
 
         print("\n[Router] Analysis:")
+
         print(analysis)
 
-        # -----------------------------
-        # 2. Context containers
-        # -----------------------------
+        # -----------------------------------
+        # 2. Shared extraction
+        # -----------------------------------
+        asset = None
+
+        symbol = None
+
+        if (
+
+            analysis["needs_market_data"]
+
+            or analysis["needs_news"]
+
+            or analysis["needs_prediction"]
+
+        ):
+
+            asset = self.asset_extractor.extract(
+                question
+            )
+
+            symbol = asset.get(
+                "possible_symbol"
+            )
+
+        # -----------------------------------
+        # 3. Context containers
+        # -----------------------------------
         rag_context = ""
 
         market_context = ""
@@ -104,57 +158,67 @@ class Router:
 
         confidence_scores = []
 
-        # -----------------------------
-        # 3. Universal RAG Augmentation
-        # -----------------------------
-        print("[Router] Trying RAG augmentation...")
-
-        rag_response = self.rag.ask(question)
-
-        rag_context = (
-            rag_response.get("context", "")
-        )
-
-        if rag_context.strip():
+        # -----------------------------------
+        # 4. Conditional RAG
+        # -----------------------------------
+        if analysis["needs_rag"]:
 
             print(
-                "[Router] RAG context added"
+                "[Router] Running RAG..."
             )
 
-            rag_confidence = (
-                self.calculate_confidence(
-                    rag_response.get("distances")
-                )
-            )
-
-            confidence_scores.append(
-                rag_confidence
-            )
-
-        else:
-
-            print(
-                "[Router] No useful RAG context"
-            )
-
-        # -----------------------------
-        # 4. Market Data Layer
-        # -----------------------------
-        if analysis["needs_market_data"]:
-
-            print("[Router] Fetching market data...")
-
-            asset = self.asset_extractor.extract(
+            rag_response = self.rag.ask(
                 question
             )
 
-            symbol = asset.get(
-                "possible_symbol"
+            rag_context = (
+                rag_response.get(
+                    "context",
+                    ""
+                )
+            )
+
+            if rag_context.strip():
+
+                print(
+                    "[Router] "
+                    "RAG context added"
+                )
+
+                rag_confidence = (
+
+                    self.calculate_confidence(
+                        rag_response.get(
+                            "distances"
+                        )
+                    )
+                )
+
+                confidence_scores.append(
+                    rag_confidence
+                )
+
+            else:
+
+                print(
+                    "[Router] "
+                    "No useful RAG context"
+                )
+
+        # -----------------------------------
+        # 5. Market Data Layer
+        # -----------------------------------
+        if analysis["needs_market_data"]:
+
+            print(
+                "[Router] "
+                "Fetching market data..."
             )
 
             if symbol:
 
                 results = (
+
                     self.market_fetcher
                     .fetch_prices(symbol)
                 )
@@ -168,6 +232,7 @@ class Router:
                     )
 
                     market_context = (
+
                         f"{symbol} current "
                         f"price is ${price}"
                     )
@@ -192,12 +257,15 @@ class Router:
                     "No symbol detected"
                 )
 
-        # -----------------------------
-        # 5. Forecast Layer
-        # -----------------------------
+        # -----------------------------------
+        # 6. Forecast Layer
+        # -----------------------------------
         if analysis["needs_prediction"]:
 
-            print("[Router] Running prediction...")
+            print(
+                "[Router] "
+                "Running prediction..."
+            )
 
             if self.forecast_model:
 
@@ -218,25 +286,88 @@ class Router:
             else:
 
                 prediction_context = (
+
                     "Forecast model "
                     "not available yet."
                 )
 
-        # -----------------------------
-        # 6. News Layer
-        # -----------------------------
+        # -----------------------------------
+        # 7. News Layer
+        # -----------------------------------
         if analysis["needs_news"]:
 
-            print("[Router] Running news analysis...")
-
-            news_context = (
-                "News analysis system "
-                "will be integrated soon."
+            print(
+                "[Router] "
+                "Running news analysis..."
             )
 
-        # -----------------------------
-        # 7. Context Fusion
-        # -----------------------------
+            if symbol:
+
+                # -----------------------------
+                # Fetch articles
+                # -----------------------------
+                articles = (
+
+                    self.news_fetcher
+                    .fetch_news(symbol)
+                )
+
+                # -----------------------------
+                # Analyze sentiment
+                # -----------------------------
+                sentiment_data = (
+
+                    self.news_analyzer
+                    .analyze(articles)
+                )
+
+                # -----------------------------
+                # Build headlines context
+                # -----------------------------
+                headlines_context = (
+
+                    self.news_fetcher
+                    .build_news_context(
+                        articles
+                    )
+                )
+
+                # -----------------------------
+                # Build final news context
+                # -----------------------------
+                news_context = (
+
+                    f"{sentiment_data['summary']}\n\n"
+
+                    f"Detected sentiment: "
+                    f"{sentiment_data['sentiment']}\n"
+
+                    f"Sentiment confidence: "
+                    f"{round(sentiment_data['confidence'] * 100, 1)}%\n\n"
+
+                    f"{headlines_context}"
+                )
+
+                # -----------------------------
+                # Add confidence
+                # -----------------------------
+                confidence_scores.append(
+
+                    sentiment_data[
+                        "confidence"
+                    ] * 100
+                )
+
+            else:
+
+                print(
+                    "[Router] "
+                    "No symbol for news fetch"
+                )
+
+        # -----------------------------------
+        # 8. Context Fusion
+        # -----------------------------------
         fused_context = self.fusion.fuse(
 
             rag_context=rag_context,
@@ -249,11 +380,12 @@ class Router:
         )
 
         print("\n[Router] Fused Context:")
+
         print(fused_context)
 
-        # -----------------------------
-        # 8. Final Response Generation
-        # -----------------------------
+        # -----------------------------------
+        # 9. Final Response Generation
+        # -----------------------------------
         if fused_context.strip():
 
             final_answer = self.llm.generate(
@@ -269,9 +401,9 @@ class Router:
                 question=question
             )
 
-        # -----------------------------
-        # 9. Final Confidence
-        # -----------------------------
+        # -----------------------------------
+        # 10. Final Confidence
+        # -----------------------------------
         if confidence_scores:
 
             final_confidence = round(
@@ -286,9 +418,9 @@ class Router:
 
             final_confidence = 65.0
 
-        # -----------------------------
-        # 10. Return response
-        # -----------------------------
+        # -----------------------------------
+        # 11. Return response
+        # -----------------------------------
         return {
 
             "question": question,
@@ -297,7 +429,7 @@ class Router:
 
             "answer": final_answer,
 
-            "confidence": final_confidence,
+            "confidence": f"{final_confidence}%",
 
             "analysis": analysis,
 

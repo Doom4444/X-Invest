@@ -1,5 +1,4 @@
 import requests
-import yfinance as yf
 import os
 
 from dotenv import load_dotenv
@@ -13,9 +12,16 @@ class MarketFetcher:
 
         self.timeout = 5
 
+        # -----------------------------------
         # API Keys
-        self.finnhub_key = os.getenv("FINNHUB_API_KEY")
-        self.twelvedata_key = os.getenv("TWELVEDATA_API_KEY")
+        # -----------------------------------
+        self.finnhub_key = os.getenv(
+            "FINNHUB_API_KEY"
+        )
+
+        self.twelvedata_key = os.getenv(
+            "TWELVEDATA_API_KEY"
+        )
 
     # -----------------------------------
     # Finnhub
@@ -31,7 +37,9 @@ class MarketFetcher:
             )
 
             response = requests.get(
+
                 url,
+
                 timeout=self.timeout
             )
 
@@ -40,17 +48,23 @@ class MarketFetcher:
             price = data.get("c")
 
             if not price:
+
                 return None
 
             return {
+
                 "source": "finnhub",
+
                 "symbol": symbol,
+
                 "price": float(price)
             }
 
         except Exception as e:
 
-            print(f"[Finnhub] Error: {e}")
+            print(
+                f"[Finnhub] Error: {e}"
+            )
 
             return None
 
@@ -68,7 +82,9 @@ class MarketFetcher:
             )
 
             response = requests.get(
+
                 url,
+
                 timeout=self.timeout
             )
 
@@ -77,45 +93,23 @@ class MarketFetcher:
             price = data.get("price")
 
             if not price:
+
                 return None
 
             return {
+
                 "source": "twelvedata",
+
                 "symbol": symbol,
+
                 "price": float(price)
             }
 
         except Exception as e:
 
-            print(f"[TwelveData] Error: {e}")
-
-            return None
-
-    # -----------------------------------
-    # Yahoo Finance (Fallback)
-    # -----------------------------------
-    def fetch_yahoo(self, symbol):
-
-        try:
-
-            ticker = yf.Ticker(symbol)
-
-            info = ticker.info
-
-            price = info.get("currentPrice")
-
-            if not price:
-                return None
-
-            return {
-                "source": "yahoo",
-                "symbol": symbol,
-                "price": float(price)
-            }
-
-        except Exception as e:
-
-            print(f"[Yahoo] Error: {e}")
+            print(
+                f"[TwelveData] Error: {e}"
+            )
 
             return None
 
@@ -126,43 +120,73 @@ class MarketFetcher:
 
         results = []
 
-        print(f"[MarketFetcher] Fetching {symbol}")
+        print(
+            f"[MarketFetcher] Fetching {symbol}"
+        )
 
+        # -----------------------------------
         # Finnhub
-        finnhub_result = self.fetch_finnhub(symbol)
+        # -----------------------------------
+        finnhub_result = (
+            self.fetch_finnhub(symbol)
+        )
 
         if finnhub_result:
 
-            print("[MarketFetcher] Finnhub success")
+            print(
+                "[MarketFetcher] "
+                "Finnhub success"
+            )
 
-            results.append(finnhub_result)
+            results.append(
+                finnhub_result
+            )
 
+        # -----------------------------------
         # TwelveData
-        twelvedata_result = self.fetch_twelvedata(symbol)
+        # -----------------------------------
+        twelvedata_result = (
+            self.fetch_twelvedata(symbol)
+        )
 
         if twelvedata_result:
 
-            print("[MarketFetcher] TwelveData success")
+            print(
+                "[MarketFetcher] "
+                "TwelveData success"
+            )
 
-            results.append(twelvedata_result)
+            results.append(
+                twelvedata_result
+            )
 
-        # Yahoo fallback
-        yahoo_result = self.fetch_yahoo(symbol)
+        # -----------------------------------
+        # No results
+        # -----------------------------------
+        if not results:
 
-        if yahoo_result:
+            print(
+                "[MarketFetcher] "
+                "No providers returned data"
+            )
 
-            print("[MarketFetcher] Yahoo success")
+            return []
 
-            results.append(yahoo_result)
-
+        # -----------------------------------
         # Remove duplicate prices
+        # -----------------------------------
         unique_results = []
 
         seen = set()
 
         for r in results:
 
-            key = (r["source"], r["price"])
+            key = (
+
+                r["source"],
+
+                r["price"]
+            )
 
             if key not in seen:
 

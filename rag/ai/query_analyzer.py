@@ -9,34 +9,46 @@ class QueryAnalyzer:
 
     def __init__(self):
 
-        # -----------------------------
+        # -----------------------------------
         # Models
-        # -----------------------------
-        self.embedding_model = "nomic-embed-text"
+        # -----------------------------------
+        self.embedding_model = (
+            "bge-m3"
+        )
 
-        self.llm_model = "iKhalid/ALLaM:7b"
+        self.llm_model = (
+            "iKhalid/ALLaM:7b"
+        )
 
-        # -----------------------------
+        # -----------------------------------
         # Semantic threshold
-        # -----------------------------
-        self.semantic_threshold = 0.75
+        # -----------------------------------
+        self.semantic_threshold = 0.72
 
-        # -----------------------------
+        # -----------------------------------
         # Intent examples
-        # -----------------------------
+        # -----------------------------------
         self.intents = {
 
+            # --------------------------------
+            # Market Data
+            # --------------------------------
             "market_data": [
 
-                "tesla stock price today",
+                "tesla live quote",
 
-                "bitcoin price now",
+                "bitcoin current quote",
 
-                "gold current price",
+                "gold trading at",
 
-                "latest oil price"
+                "apple ticker",
+
+                "oil live quote"
             ],
 
+            # --------------------------------
+            # General Finance
+            # --------------------------------
             "general_finance": [
 
                 "what is diversification",
@@ -45,56 +57,85 @@ class QueryAnalyzer:
 
                 "define portfolio",
 
-                "what is inflation"
+                "what is inflation",
+
+                "difference between stocks and bonds",
+
+                "what is cpi",
+
+                "what is monetary policy",
+
+                "what are corporate bonds"
             ],
 
+            # --------------------------------
+            # Analysis
+            # --------------------------------
             "analysis": [
 
-                "should i invest in tesla",
+                "financial report analysis",
 
-                "portfolio strategy advice",
+                "economic outlook",
+
+                "company performance",
+
+                "financial statement analysis",
+
+                "macroeconomic analysis",
 
                 "market analysis",
 
-                "stock market risks"
+                "global economy outlook",
+
+                "economic growth risks"
             ],
 
+            # --------------------------------
+            # Forecast
+            # --------------------------------
             "forecast": [
 
-                "predict tesla price",
+                "predict tesla future trend",
 
-                "future stock price",
+                "future outlook for bitcoin",
 
-                "market forecast",
+                "forecast stock movement",
 
-                "next year stock prediction"
+                "next year market forecast"
             ],
 
+            # --------------------------------
+            # News Analysis
+            # --------------------------------
             "news_analysis": [
 
-                "why is tesla dropping",
+                "latest bitcoin news",
 
-                "latest market news",
+                "breaking market news",
 
-                "how news affects stocks",
+                "why is tesla falling today",
 
-                "economic news impact"
+                "recent economic news",
+
+                "market headlines"
             ]
         }
 
-        # -----------------------------
-        # Precompute intent embeddings
-        # -----------------------------
+        # -----------------------------------
+        # Precompute embeddings
+        # -----------------------------------
         self.intent_embeddings = {}
 
         self.prepare_intent_embeddings()
 
-    # -----------------------------
+    # -----------------------------------
     # Prepare embeddings once
-    # -----------------------------
+    # -----------------------------------
     def prepare_intent_embeddings(self):
 
-        for intent, examples in self.intents.items():
+        for intent, examples in (
+            self.intents.items()
+        ):
 
             embeddings = []
 
@@ -105,6 +146,7 @@ class QueryAnalyzer:
                     model=self.embedding_model,
 
                     prompt=text
+
                 )["embedding"]
 
                 embeddings.append(emb)
@@ -113,54 +155,82 @@ class QueryAnalyzer:
                 np.array(embeddings)
             )
 
-    # -----------------------------
+    # -----------------------------------
     # Rule Layer
-    # -----------------------------
+    # -----------------------------------
     def rule_layer(self, question):
 
         q = question.lower()
 
-        # -----------------------------
+        # -----------------------------------
         # Forecast FIRST
-        # -----------------------------
+        # -----------------------------------
         if re.search(
 
-            r"predict|forecast|future|next year",
+            r"predict|forecast|future outlook|next year",
 
             q
         ):
 
-            return "forecast", 0.95, "rule"
+            return (
+                "forecast",
+                0.95,
+                "rule"
+            )
 
-        # -----------------------------
-        # Market Data
-        # -----------------------------
-        if re.search(
-
-            r"price|today|current|now|live|latest|market|trading|ticker|usd|btc|gold|oil",
-
-            q
-        ):
-
-            return "market_data", 0.95, "rule"
-
-        # -----------------------------
+        # -----------------------------------
         # News Analysis
-        # -----------------------------
+        # -----------------------------------
         if re.search(
 
-            r"news|breaking|headline|impact|geopolitical",
+            r"latest news|breaking news|headline|falling today|dropping today|recent news",
 
             q
         ):
 
-            return "news_analysis", 0.92, "rule"
+            return (
+                "news_analysis",
+                0.92,
+                "rule"
+            )
+
+        # -----------------------------------
+        # Market Data
+        # -----------------------------------
+        if re.search(
+
+            r"ticker|live quote|current quote|trading at",
+
+            q
+        ):
+
+            return (
+                "market_data",
+                0.90,
+                "rule"
+            )
+
+        # -----------------------------------
+        # Analysis
+        # -----------------------------------
+        if re.search(
+
+            r"financial report|economic outlook|company performance|market analysis",
+
+            q
+        ):
+
+            return (
+                "analysis",
+                0.90,
+                "rule"
+            )
 
         return None, 0, None
 
-    # -----------------------------
+    # -----------------------------------
     # Semantic Layer
-    # -----------------------------
+    # -----------------------------------
     def embedding_layer(self, question):
 
         q_emb = ollama.embeddings(
@@ -171,17 +241,24 @@ class QueryAnalyzer:
 
         )["embedding"]
 
-        q_emb = np.array(q_emb).reshape(1, -1)
+        q_emb = np.array(q_emb).reshape(
+            1,
+            -1
+        )
 
         best_intent = None
 
         best_score = 0
 
-        for intent, emb in self.intent_embeddings.items():
+        for intent, emb in (
+            self.intent_embeddings.items()
+        ):
 
             score = cosine_similarity(
+
                 q_emb,
                 emb
+
             ).max()
 
             if score > best_score:
@@ -192,13 +269,13 @@ class QueryAnalyzer:
 
         return best_intent, best_score
 
-    # -----------------------------
+    # -----------------------------------
     # LLM Fallback
-    # -----------------------------
+    # -----------------------------------
     def llm_layer(self, question):
 
         prompt = f"""
-Classify the following finance question
+Classify the following financial question
 into ONE category.
 
 Categories:
@@ -207,6 +284,22 @@ general_finance
 analysis
 forecast
 news_analysis
+
+Rules:
+- market_data:
+  live prices and current values
+
+- general_finance:
+  educational concepts
+
+- analysis:
+  reports and financial discussions
+
+- forecast:
+  future predictions
+
+- news_analysis:
+  recent events and news
 
 Return ONLY the category name.
 
@@ -219,6 +312,7 @@ Question:
             model=self.llm_model,
 
             messages=[
+
                 {
                     "role": "user",
                     "content": prompt
@@ -227,17 +321,25 @@ Question:
         )
 
         return (
+
             response["message"]["content"]
+
             .strip()
+
+            .lower()
         )
 
-    # -----------------------------
+    # -----------------------------------
     # Routing Metadata
-    # -----------------------------
+    # -----------------------------------
     def build_metadata(
+
         self,
+
         intent,
+
         confidence,
+
         method
     ):
 
@@ -256,51 +358,76 @@ Question:
 
             "needs_news": False,
 
-            "needs_market_data": False
+            "needs_market_data": False,
+
+            "needs_rag": False
         }
 
-        # -----------------------------
+        # -----------------------------------
         # Intent Routing
-        # -----------------------------
+        # -----------------------------------
         if intent == "forecast":
 
-            metadata["needs_prediction"] = True
+            metadata[
+                "needs_prediction"
+            ] = True
 
-            metadata["needs_market_data"] = True
+            metadata[
+                "needs_market_data"
+            ] = True
 
         elif intent == "market_data":
 
-            metadata["needs_market_data"] = True
+            metadata[
+                "needs_market_data"
+            ] = True
 
         elif intent == "news_analysis":
 
-            metadata["needs_news"] = True
+            metadata[
+                "needs_news"
+            ] = True
 
-            metadata["needs_market_data"] = True
+            metadata[
+                "needs_market_data"
+            ] = True
+
+        elif intent == "general_finance":
+
+            metadata[
+                "needs_rag"
+            ] = True
 
         elif intent == "analysis":
 
-            metadata["needs_prediction"] = True
+            metadata[
+                "needs_rag"
+            ] = True
 
-            metadata["needs_news"] = True
+            metadata[
+                "needs_news"
+            ] = True
 
         return metadata
 
-    # -----------------------------
+    # -----------------------------------
     # Main Analyzer
-    # -----------------------------
+    # -----------------------------------
     def analyze(self, question):
 
-        # -----------------------------
+        # -----------------------------------
         # 1. Rule Layer
-        # -----------------------------
+        # -----------------------------------
         intent, confidence, method = (
+
             self.rule_layer(question)
         )
 
         if confidence > 0.9:
 
-            print("[Analyzer] Rule match")
+            print(
+                "[Analyzer] Rule match"
+            )
 
             return self.build_metadata(
 
@@ -311,21 +438,25 @@ Question:
                 method
             )
 
-        # -----------------------------
+        # -----------------------------------
         # 2. Semantic Layer
-        # -----------------------------
+        # -----------------------------------
         intent, score = (
             self.embedding_layer(question)
         )
 
         print(
+
             f"[Analyzer] Semantic score: "
+
             f"{round(score, 3)}"
         )
 
         if score > self.semantic_threshold:
 
-            print("[Analyzer] Semantic match")
+            print(
+                "[Analyzer] Semantic match"
+            )
 
             return self.build_metadata(
 
@@ -336,12 +467,16 @@ Question:
                 "semantic"
             )
 
-        # -----------------------------
+        # -----------------------------------
         # 3. LLM Fallback
-        # -----------------------------
-        print("[Analyzer] Fallback to LLM")
+        # -----------------------------------
+        print(
+            "[Analyzer] Fallback to LLM"
+        )
 
-        intent = self.llm_layer(question)
+        intent = self.llm_layer(
+            question
+        )
 
         return self.build_metadata(
 
