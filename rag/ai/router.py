@@ -11,6 +11,9 @@ from rag.online.news_fetcher import NewsFetcher
 from rag.online.news_analyzer import NewsAnalyzer
 
 from rag.core.context_fusion import ContextFusion
+from rag.core.forecast_engine import ForecastEngine
+
+from rag.preprocessing.utils import extract_date
 
 
 class Router:
@@ -48,9 +51,9 @@ class Router:
         self.news_analyzer = NewsAnalyzer()
 
         # -----------------------------------
-        # Forecast placeholder
+        # Forecast system
         # -----------------------------------
-        self.forecast_model = None
+        self.forecast_engine = ForecastEngine()
 
     # -----------------------------------
     # RAG confidence calculation
@@ -64,9 +67,6 @@ class Router:
         analyzer_confidence=0.65
     ):
 
-        # -----------------------------------
-        # No retrieval
-        # -----------------------------------
         if not distances:
 
             return round(
@@ -78,9 +78,6 @@ class Router:
 
         for d in distances:
 
-            # --------------------------------
-            # Cosine similarity
-            # --------------------------------
             similarity = max(
                 0,
                 1 - d
@@ -90,18 +87,12 @@ class Router:
                 similarity
             )
 
-        # -----------------------------------
-        # Average similarity
-        # -----------------------------------
         avg_similarity = (
 
             sum(similarities) /
             len(similarities)
         )
 
-        # -----------------------------------
-        # Strong retrieval consistency
-        # -----------------------------------
         strong_matches = [
 
             s for s in similarities
@@ -115,9 +106,6 @@ class Router:
             len(similarities)
         )
 
-        # -----------------------------------
-        # Retrieval confidence
-        # -----------------------------------
         retrieval_confidence = (
 
             (0.7 * avg_similarity) +
@@ -125,9 +113,6 @@ class Router:
             (0.3 * consistency)
         )
 
-        # -----------------------------------
-        # Final fusion
-        # -----------------------------------
         final_confidence = (
 
             (0.35 * analyzer_confidence) +
@@ -224,9 +209,6 @@ class Router:
 
             return 65.0
 
-        # -----------------------------------
-        # Final normalized confidence
-        # -----------------------------------
         final_confidence = (
 
             sum(weighted_scores) /
@@ -255,9 +237,24 @@ class Router:
         print(analysis)
 
         # -----------------------------------
-        # 2. Shared extraction
+        # 2. Extract date
         # -----------------------------------
-        asset = None
+        target_date = extract_date(
+            question
+        )
+
+        if target_date:
+
+            print(
+                f"[Router] "
+                f"Detected date: "
+                f"{target_date}"
+            )
+
+        # -----------------------------------
+        # 3. Shared extraction
+        # -----------------------------------
+        asset = {}
 
         symbol = None
 
@@ -275,12 +272,14 @@ class Router:
                 question
             )
 
-            symbol = asset.get(
-                "possible_symbol"
-            )
+            if asset:
+
+                symbol = asset.get(
+                    "possible_symbol"
+                )
 
         # -----------------------------------
-        # 3. Context containers
+        # 4. Context containers
         # -----------------------------------
         rag_context = ""
 
@@ -302,7 +301,7 @@ class Router:
         prediction_confidence = None
 
         # -----------------------------------
-        # 4. Conditional RAG
+        # 5. Conditional RAG
         # -----------------------------------
         if analysis["needs_rag"]:
 
@@ -349,15 +348,8 @@ class Router:
                     f"{rag_confidence}%"
                 )
 
-            else:
-
-                print(
-                    "[Router] "
-                    "No useful RAG context"
-                )
-
         # -----------------------------------
-        # 5. Market Data Layer
+        # 6. Market Data Layer
         # -----------------------------------
         if analysis["needs_market_data"]:
 
@@ -384,6 +376,8 @@ class Router:
 
                     market_context = (
 
+                        "[MARKET DATA]\n"
+
                         f"{symbol} current "
                         f"price is ${price}"
                     )
@@ -395,49 +389,82 @@ class Router:
                         "Market fetch failed"
                     )
 
-            else:
-
-                print(
-                    "[Router] "
-                    "No symbol detected"
-                )
-
         # -----------------------------------
-        # 6. Forecast Layer
+        # 7. Forecast Layer
         # -----------------------------------
         if analysis["needs_prediction"]:
 
             print(
                 "[Router] "
-                "Running prediction..."
+                "Running forecast..."
             )
 
-            if self.forecast_model:
+            if symbol:
 
-                prediction, prob = (
+                prediction = (
 
-                    self.forecast_model
-                    .predict(question)
+                    self.forecast_engine
+                    .predict(
+
+                        symbol,
+
+                        target_date
+                    )
                 )
 
-                prediction_context = (
-                    prediction
-                )
+                if prediction:
 
-                prediction_confidence = (
-                    prob * 100
-                )
+                    prediction_context = (
+
+                        "[FORECAST]\n"
+
+                        +
+
+                        self.forecast_engine
+                        .build_forecast_context(
+                            prediction
+                        )
+                    )
+
+                    prediction_confidence = float(
+
+                        prediction.get(
+                            "confidence",
+                            70
+                        )
+                    )
+
+                    print(
+                        "[Router] "
+                        "Forecast added"
+                    )
+
+                else:
+
+                    prediction_context = (
+
+                        "[FORECAST]\n"
+
+                        "No forecast data "
+                        "available for "
+                        "this asset."
+                    )
+
+                    print(
+                        "[Router] "
+                        "Forecast failed"
+                    )
 
             else:
 
-                prediction_context = (
-
-                    "Forecast model "
-                    "not available yet."
+                print(
+                    "[Router] "
+                    "No symbol detected "
+                    "for forecast"
                 )
 
         # -----------------------------------
-        # 7. News Layer
+        # 8. News Layer
         # -----------------------------------
         if analysis["needs_news"]:
 
@@ -448,27 +475,25 @@ class Router:
 
             if symbol:
 
-                # -----------------------------
-                # Fetch articles
-                # -----------------------------
                 articles = (
 
                     self.news_fetcher
-                    .fetch_news(symbol)
+                    .fetch_news(
+
+                        symbol=symbol,
+
+                        asset_name=asset.get(
+                            "asset_name"
+                        )
+                    )
                 )
 
-                # -----------------------------
-                # Analyze sentiment
-                # -----------------------------
                 sentiment_data = (
 
                     self.news_analyzer
                     .analyze(articles)
                 )
 
-                # -----------------------------
-                # Build headlines context
-                # -----------------------------
                 headlines_context = (
 
                     self.news_fetcher
@@ -477,10 +502,9 @@ class Router:
                     )
                 )
 
-                # -----------------------------
-                # Build final news context
-                # -----------------------------
                 news_context = (
+
+                    "[NEWS]\n"
 
                     f"{sentiment_data['summary']}\n\n"
 
@@ -493,9 +517,6 @@ class Router:
                     f"{headlines_context}"
                 )
 
-                # -----------------------------
-                # Store confidence
-                # -----------------------------
                 news_confidence = (
 
                     sentiment_data[
@@ -503,15 +524,8 @@ class Router:
                     ] * 100
                 )
 
-            else:
-
-                print(
-                    "[Router] "
-                    "No symbol for news fetch"
-                )
-
         # -----------------------------------
-        # 8. Context Fusion
+        # 9. Context Fusion
         # -----------------------------------
         fused_context = self.fusion.fuse(
 
@@ -529,7 +543,7 @@ class Router:
         print(fused_context)
 
         # -----------------------------------
-        # 9. Final Response Generation
+        # 10. Final Response
         # -----------------------------------
         if fused_context.strip():
 
@@ -547,7 +561,7 @@ class Router:
             )
 
         # -----------------------------------
-        # 10. Final Confidence
+        # 11. Final confidence
         # -----------------------------------
         final_confidence = (
 
@@ -572,14 +586,13 @@ class Router:
                 ),
 
                 prediction_confidence=(
-
                     prediction_confidence
                 )
             )
         )
 
         # -----------------------------------
-        # 11. Return response
+        # 12. Return
         # -----------------------------------
         return {
 

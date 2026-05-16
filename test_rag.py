@@ -1,3 +1,5 @@
+# 
+-------------------------------------------------------
 from rag.ai.router import Router
 
 
@@ -5,227 +7,136 @@ router = Router()
 
 
 # ===================================
-# Structured Test Cases
+# Forecast Test Cases
 # ===================================
-TEST_CASES = {
+FORECAST_TESTS = [
 
     # -----------------------------------
-    # General Finance + RAG
+    # Basic forecast
     # -----------------------------------
-    "general_finance": [
+    "Predict Tesla",
 
-        "What is diversification?",
+    "Predict Apple",
 
-        "Why is diversification important for investors?",
+    "Forecast Bitcoin",
 
-        "What is inflation?",
-
-        "How is inflation measured using CPI?",
-
-        "What is the Consumer Price Index?",
-
-        "What is core inflation?",
-
-        "What are corporate bonds?",
-
-        "What is default risk in bonds?",
-
-        "Difference between stocks and corporate bonds",
-
-        "What are investment-grade bonds?",
-
-        "Why do long-term bonds usually offer higher interest rates?",
-
-        "Why is saving and investing important?",
-
-        "How can investing help achieve financial security?",
-
-        "What questions should investors ask financial professionals?"
-    ],
+    "Future outlook for oil prices",
 
     # -----------------------------------
-    # Federal Reserve / Monetary Policy
+    # Date-specific forecast
     # -----------------------------------
-    "fed_and_policy": [
+    "Predict Tesla on May 20 2026",
 
-        "What are the main functions of the Federal Reserve?",
+    "Forecast Apple stock price next week",
 
-        "What is monetary policy?",
+    "Bitcoin prediction tomorrow",
 
-        "How does the Federal Reserve conduct monetary policy?",
-
-        "What are the Federal Reserve's key responsibilities?",
-
-        "What does the Fed do to maintain financial stability?",
-
-        "What does the Monetary Policy Report say about inflation?",
-
-        "What does the Federal Reserve say about labor markets?",
-
-        "What are the recent economic developments discussed in the report?"
-    ],
+    "Forecast oil prices next month",
 
     # -----------------------------------
-    # OECD / Macroeconomics
+    # Mixed questions
     # -----------------------------------
-    "macroeconomics": [
+    "Why is Tesla falling and what is the future outlook?",
 
-        "What does the OECD report say about global GDP growth in 2025?",
+    "Latest Apple news and future prediction",
 
-        "What are the risks facing the global economy according to OECD?",
-
-        "How does the OECD describe trade policy uncertainty?",
-
-        "What does OECD say about inflation trends?",
-
-        "Why does OECD believe global growth is fragile?"
-    ],
+    "What is happening with Bitcoin and where is it headed?",
 
     # -----------------------------------
-    # WIPO Financial Report
+    # Edge cases
     # -----------------------------------
-    "financial_reports": [
+    "Predict ABCXYZ",
 
-        "What happened to WIPO financial performance in 2020?",
+    "Future price of random asset",
 
-        "How did COVID-19 affect WIPO financial operations?",
-
-        "What financial risks were discussed in the WIPO report?"
-    ],
+    "Forecast unknown company stock",
 
     # -----------------------------------
-    # Market Data
+    # Stress tests
     # -----------------------------------
-    "market_data": [
+    "Can you predict Tesla stock movement for the coming days?",
 
-        "What is Tesla stock price today?",
+    "What is the expected return for Apple?",
 
-        "Bitcoin price now",
+    "Show forecast confidence for Bitcoin",
 
-        "Gold price today",
-
-        "Current Apple stock price",
-
-        "Latest oil price"
-    ],
-
-    # -----------------------------------
-    # Forecast
-    # -----------------------------------
-    "forecast": [
-
-        "Predict Tesla future stock price",
-
-        "Forecast Bitcoin next year",
-
-        "Future outlook for oil prices"
-    ],
-
-    # -----------------------------------
-    # News Analysis
-    # -----------------------------------
-    "news_analysis": [
-
-        "Why is Tesla stock falling today?",
-
-        "Latest Bitcoin news",
-
-        "What is affecting oil prices recently?",
-
-        "Recent market news about Apple"
-    ],
-
-    # -----------------------------------
-    # Edge Cases
-    # -----------------------------------
-    "edge_cases": [
-
-        "What is ABCXYZ coin price?",
-
-        "Predict unknown asset future",
-
-        "Latest news about random company",
-
-        "Tell me about some unknown economy",
-
-        "What is the price of random asset XYZ?"
-    ]
-}
+    "What trend is expected for Tesla stock?"
+]
 
 
 # ===================================
-# Run All Tests
+# Run Forecast Tests
 # ===================================
-for category, questions in TEST_CASES.items():
+for question in FORECAST_TESTS:
 
-    print("\n" + "#" * 80)
+    print("\n" + "=" * 80)
 
-    print(
-        f"TEST CATEGORY: "
-        f"{category.upper()}"
-    )
+    print(f"QUESTION: {question}")
 
-    print("#" * 80)
+    print("=" * 80)
 
-    for q in questions:
+    try:
 
-        print("\n" + "=" * 70)
+        result = router.route(question)
 
-        print(f"QUESTION: {q}")
+        print("\nANSWER:\n")
 
-        print("=" * 70)
+        print(
+            result.get(
+                "answer",
+                "No answer"
+            )
+        )
 
-        try:
+        print("\nCONFIDENCE:")
 
-            result = router.route(q)
+        print(
+            result.get(
+                "confidence",
+                "N/A"
+            )
+        )
 
-            print("\nANSWER:\n")
+        print("\nINTENT:")
+
+        print(
+            result.get(
+                "intent",
+                "N/A"
+            )
+        )
+
+        context = result.get(
+            "context",
+            ""
+        )
+
+        print("\nCONTEXT LENGTH:")
+
+        print(len(context))
+
+        print("\nCONTEXT PREVIEW:\n")
+
+        preview = context[:1000]
+
+        print(preview)
+
+        if len(context) > 1000:
 
             print(
-                result.get("answer")
+                "\n...[TRUNCATED]..."
             )
 
-            print("\nCONFIDENCE:")
+    except KeyboardInterrupt:
 
-            print(
-                result.get("confidence")
-            )
+        print(
+            "\n[STOPPED BY USER]"
+        )
 
-            print("\nINTENT:")
+        break
 
-            print(
-                result.get("intent")
-            )
+    except Exception as e:
 
-            context = result.get(
-                "context",
-                ""
-            )
-
-            print("\nCONTEXT LENGTH:")
-
-            print(len(context))
-
-            print("\nCONTEXT PREVIEW:\n")
-
-            preview = context[:500]
-
-            print(preview)
-
-            if len(context) > 500:
-
-                print(
-                    "\n...[TRUNCATED]..."
-                )
-
-        except KeyboardInterrupt:
-
-            print(
-                "\n[STOPPED BY USER]"
-            )
-
-            exit()
-
-        except Exception as e:
-
-            print(f"\n[ERROR] {e}")
+        print(
+            f"\n[ERROR] {e}"
+        )
