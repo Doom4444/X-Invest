@@ -156,6 +156,51 @@ class AssetExtractor:
         return None
 
     # -----------------------------------
+    # Regex Symbol Extraction
+    # -----------------------------------
+    def regex_extract(self, question):
+
+        # --------------------------------
+        # Symbol patterns
+        # --------------------------------
+        pattern = r"\b[A-Z]{2,5}(?:-[A-Z]+|=F)?\b"
+
+        matches = re.findall(
+            pattern,
+            question
+        )
+
+        if not matches:
+
+            return None
+
+        symbol = matches[0].upper()
+
+        # --------------------------------
+        # Basic asset type inference
+        # --------------------------------
+        asset_type = "unknown"
+
+        if "-USD" in symbol:
+
+            asset_type = "crypto"
+
+        elif "=F" in symbol:
+
+            asset_type = "commodity"
+
+        return {
+
+            "asset_name": symbol,
+
+            "asset_type": asset_type,
+
+            "possible_symbol": symbol,
+
+            "method": "regex"
+        }
+
+    # -----------------------------------
     # Clean JSON Text
     # -----------------------------------
     def clean_json_response(self, text):
@@ -292,6 +337,26 @@ Question:
                 )
 
             # --------------------------------
+            # Normalize symbol
+            # --------------------------------
+            if data.get(
+                "possible_symbol"
+            ):
+
+                data[
+                    "possible_symbol"
+                ] = (
+
+                    data[
+                        "possible_symbol"
+                    ]
+
+                    .upper()
+
+                    .strip()
+                )
+
+            # --------------------------------
             # Add metadata
             # --------------------------------
             data["method"] = "llm"
@@ -339,7 +404,22 @@ Question:
             return result
 
         # --------------------------------
-        # 2. LLM fallback
+        # 2. Regex extraction
+        # --------------------------------
+        result = self.regex_extract(
+            question
+        )
+
+        if result:
+
+            print(
+                "[AssetExtractor] Regex match"
+            )
+
+            return result
+
+        # --------------------------------
+        # 3. LLM fallback
         # --------------------------------
         print(
 

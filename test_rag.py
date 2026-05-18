@@ -1,5 +1,7 @@
-# 
--------------------------------------------------------
+# -------------------------------------------------------
+# Full System Evaluation Suite
+# -------------------------------------------------------
+
 from rag.ai.router import Router
 
 
@@ -7,136 +9,361 @@ router = Router()
 
 
 # ===================================
-# Forecast Test Cases
+# 1. Intent Routing Tests
+# ===================================
+INTENT_TESTS = [
+
+    # --------------------------------
+    # Forecast intent
+    # --------------------------------
+    "Predict Tesla",
+
+    "Forecast Bitcoin tomorrow",
+
+    "Tesla future outlook",
+
+    # --------------------------------
+    # Market intent
+    # --------------------------------
+    "What is Tesla price now?",
+
+    "Current Bitcoin price",
+
+    "How much is Apple stock?",
+
+    # --------------------------------
+    # News / analysis intent
+    # --------------------------------
+    "Why is Tesla falling?",
+
+    "Latest Apple news",
+
+    "What is happening with Bitcoin?",
+
+    # --------------------------------
+    # General finance
+    # --------------------------------
+    "What is diversification?",
+
+    "Explain market volatility",
+
+    "What is risk management?"
+]
+
+
+# ===================================
+# 2. Asset Extraction Tests
+# ===================================
+ASSET_TESTS = [
+
+    # --------------------------------
+    # Rule-based extraction
+    # --------------------------------
+    "Predict Tesla",
+
+    "Forecast Apple",
+
+    "Bitcoin prediction",
+
+    # --------------------------------
+    # Regex extraction
+    # --------------------------------
+    "Predict TSLA",
+
+    "What about AAPL next week?",
+
+    "Forecast BTC-USD",
+
+    "Should I buy NVDA?",
+
+    # --------------------------------
+    # Unknown assets
+    # --------------------------------
+    "Predict ABCXYZ",
+
+    "Future of RANDOMCOIN",
+
+    "Forecast unknown company"
+]
+
+
+# ===================================
+# 3. Forecast Tests
 # ===================================
 FORECAST_TESTS = [
 
-    # -----------------------------------
+    # --------------------------------
     # Basic forecast
-    # -----------------------------------
+    # --------------------------------
     "Predict Tesla",
 
     "Predict Apple",
 
     "Forecast Bitcoin",
 
-    "Future outlook for oil prices",
-
-    # -----------------------------------
+    # --------------------------------
     # Date-specific forecast
-    # -----------------------------------
+    # --------------------------------
     "Predict Tesla on May 20 2026",
-
-    "Forecast Apple stock price next week",
 
     "Bitcoin prediction tomorrow",
 
-    "Forecast oil prices next month",
+    "Forecast Apple next week",
 
-    # -----------------------------------
-    # Mixed questions
-    # -----------------------------------
-    "Why is Tesla falling and what is the future outlook?",
+    # --------------------------------
+    # Forecast metrics
+    # --------------------------------
+    "Show forecast confidence for Tesla",
 
-    "Latest Apple news and future prediction",
+    "Expected return for Apple",
 
-    "What is happening with Bitcoin and where is it headed?",
-
-    # -----------------------------------
-    # Edge cases
-    # -----------------------------------
-    "Predict ABCXYZ",
-
-    "Future price of random asset",
-
-    "Forecast unknown company stock",
-
-    # -----------------------------------
-    # Stress tests
-    # -----------------------------------
-    "Can you predict Tesla stock movement for the coming days?",
-
-    "What is the expected return for Apple?",
-
-    "Show forecast confidence for Bitcoin",
-
-    "What trend is expected for Tesla stock?"
+    "Tesla forecast trend"
 ]
 
 
 # ===================================
-# Run Forecast Tests
+# 4. RAG Retrieval Tests
 # ===================================
-for question in FORECAST_TESTS:
+RAG_TESTS = [
 
-    print("\n" + "=" * 80)
+    # --------------------------------
+    # Educational finance
+    # --------------------------------
+    "What is inflation?",
 
-    print(f"QUESTION: {question}")
+    "Explain ETFs",
 
-    print("=" * 80)
+    "What is portfolio diversification?",
 
-    try:
+    # --------------------------------
+    # Complex retrieval
+    # --------------------------------
+    "How does compound interest affect investments?",
 
-        result = router.route(question)
+    "What are the risks of cryptocurrency investing?",
 
-        print("\nANSWER:\n")
+    "Explain support and resistance levels"
+]
 
-        print(
-            result.get(
-                "answer",
-                "No answer"
-            )
-        )
 
-        print("\nCONFIDENCE:")
+# ===================================
+# 5. Multi-Source Fusion Tests
+# ===================================
+FUSION_TESTS = [
 
-        print(
-            result.get(
-                "confidence",
-                "N/A"
-            )
-        )
+    # --------------------------------
+    # Forecast + News
+    # --------------------------------
+    "Why is Tesla falling and what is the future outlook?",
 
-        print("\nINTENT:")
+    "Latest Apple news and future prediction",
 
-        print(
-            result.get(
-                "intent",
-                "N/A"
-            )
-        )
+    # --------------------------------
+    # Market + Forecast + News
+    # --------------------------------
+    "What is happening with Bitcoin and where is it headed?",
 
-        context = result.get(
-            "context",
-            ""
-        )
+    "Analyze Tesla stock and predict the next trend",
 
-        print("\nCONTEXT LENGTH:")
+    # --------------------------------
+    # Full hybrid reasoning
+    # --------------------------------
+    "Should investors worry about Tesla's recent decline and future forecast?"
+]
 
-        print(len(context))
 
-        print("\nCONTEXT PREVIEW:\n")
+# ===================================
+# 6. Hallucination Resistance Tests
+# ===================================
+HALLUCINATION_TESTS = [
 
-        preview = context[:1000]
+    # --------------------------------
+    # Fake assets
+    # --------------------------------
+    "Predict SUPERFAKECOIN",
 
-        print(preview)
+    "Forecast XYZABC123",
 
-        if len(context) > 1000:
+    # --------------------------------
+    # Impossible questions
+    # --------------------------------
+    "What will Tesla stock be exactly in 10 years?",
+
+    "Can you guarantee Bitcoin profits?",
+
+    # --------------------------------
+    # Missing data
+    # --------------------------------
+    "Forecast unknown private company stock"
+]
+
+
+# ===================================
+# 7. Stress Tests
+# ===================================
+STRESS_TESTS = [
+
+    # --------------------------------
+    # Long queries
+    # --------------------------------
+    (
+        "Can you analyze Tesla stock "
+        "considering market trends, "
+        "recent news, future forecasts, "
+        "and investment risks?"
+    ),
+
+    # --------------------------------
+    # Multi-asset queries
+    # --------------------------------
+    (
+        "Compare Tesla, Apple, "
+        "and Bitcoin future outlooks"
+    ),
+
+    # --------------------------------
+    # Ambiguous wording
+    # --------------------------------
+    "What do you think about Tesla?",
+
+    "Is Bitcoin safe?",
+
+    "Should I invest now?"
+]
+
+
+# ===================================
+# All Test Groups
+# ===================================
+ALL_TEST_GROUPS = {
+
+    "Intent Tests":
+        INTENT_TESTS,
+
+    "Asset Extraction Tests":
+        ASSET_TESTS,
+
+    "Forecast Tests":
+        FORECAST_TESTS,
+
+    "RAG Tests":
+        RAG_TESTS,
+
+    "Fusion Tests":
+        FUSION_TESTS,
+
+    "Hallucination Tests":
+        HALLUCINATION_TESTS,
+
+    "Stress Tests":
+        STRESS_TESTS
+}
+
+
+# ===================================
+# Save Results
+# ===================================
+with open(
+
+    "test_results.txt",
+
+    "w",
+
+    encoding="utf-8"
+
+) as f:
+
+    for group_name, tests in ALL_TEST_GROUPS.items():
+
+        separator = "=" * 80
+
+        f.write("\n")
+        f.write(separator + "\n")
+
+        f.write(group_name.upper() + "\n")
+
+        f.write(separator + "\n")
+
+        for question in tests:
 
             print(
-                "\n...[TRUNCATED]..."
+                f"\nRunning: {question}"
             )
 
-    except KeyboardInterrupt:
+            f.write("\n")
+            f.write("-" * 80 + "\n")
 
-        print(
-            "\n[STOPPED BY USER]"
-        )
+            f.write(
+                f"QUESTION: {question}\n"
+            )
 
-        break
+            f.write("-" * 80 + "\n")
 
-    except Exception as e:
+            try:
 
-        print(
-            f"\n[ERROR] {e}"
-        )
+                result = router.route(
+                    question
+                )
+
+                f.write("\nANSWER:\n\n")
+
+                f.write(
+                    result["answer"] + "\n"
+                )
+
+                f.write(
+                    "\nCONFIDENCE:\n"
+                )
+
+                f.write(
+                    str(
+                        result[
+                            "confidence"
+                        ]
+                    ) + "\n"
+                )
+
+                f.write("\nINTENT:\n")
+
+                f.write(
+                    result["intent"] + "\n"
+                )
+
+                f.write(
+                    "\nCONTEXT LENGTH:\n"
+                )
+
+                f.write(
+                    str(
+                        len(
+                            result[
+                                "context"
+                            ]
+                        )
+                    ) + "\n"
+                )
+
+                f.write(
+                    "\nCONTEXT PREVIEW:\n\n"
+                )
+
+                f.write(
+                    result[
+                        "context"
+                    ][:2000]
+                )
+
+                f.write("\n\n")
+
+            except Exception as e:
+
+                f.write(
+                    f"\nERROR: {e}\n"
+                )
+
+                f.write("\n\n")
+
+print(
+    "\n✅ Results saved to "
+    "test_results.txt"
+)

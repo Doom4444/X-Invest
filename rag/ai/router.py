@@ -67,6 +67,9 @@ class Router:
         analyzer_confidence=0.65
     ):
 
+        # -----------------------------------
+        # No retrieval
+        # -----------------------------------
         if not distances:
 
             return round(
@@ -78,6 +81,9 @@ class Router:
 
         for d in distances:
 
+            # --------------------------------
+            # Cosine similarity
+            # --------------------------------
             similarity = max(
                 0,
                 1 - d
@@ -87,12 +93,18 @@ class Router:
                 similarity
             )
 
+        # -----------------------------------
+        # Average similarity
+        # -----------------------------------
         avg_similarity = (
 
             sum(similarities) /
             len(similarities)
         )
 
+        # -----------------------------------
+        # Strong retrieval consistency
+        # -----------------------------------
         strong_matches = [
 
             s for s in similarities
@@ -106,6 +118,9 @@ class Router:
             len(similarities)
         )
 
+        # -----------------------------------
+        # Retrieval confidence
+        # -----------------------------------
         retrieval_confidence = (
 
             (0.7 * avg_similarity) +
@@ -113,6 +128,9 @@ class Router:
             (0.3 * consistency)
         )
 
+        # -----------------------------------
+        # Final fusion
+        # -----------------------------------
         final_confidence = (
 
             (0.35 * analyzer_confidence) +
@@ -209,6 +227,9 @@ class Router:
 
             return 65.0
 
+        # -----------------------------------
+        # Final normalized confidence
+        # -----------------------------------
         final_confidence = (
 
             sum(weighted_scores) /
@@ -237,7 +258,7 @@ class Router:
         print(analysis)
 
         # -----------------------------------
-        # 2. Extract date
+        # 2. Extract target date
         # -----------------------------------
         target_date = extract_date(
             question
@@ -246,7 +267,9 @@ class Router:
         if target_date:
 
             print(
-                f"[Router] "
+
+                "[Router] "
+
                 f"Detected date: "
                 f"{target_date}"
             )
@@ -348,6 +371,13 @@ class Router:
                     f"{rag_confidence}%"
                 )
 
+            else:
+
+                print(
+                    "[Router] "
+                    "No useful RAG context"
+                )
+
         # -----------------------------------
         # 6. Market Data Layer
         # -----------------------------------
@@ -376,8 +406,6 @@ class Router:
 
                     market_context = (
 
-                        "[MARKET DATA]\n"
-
                         f"{symbol} current "
                         f"price is ${price}"
                     )
@@ -388,6 +416,13 @@ class Router:
                         "[Router] "
                         "Market fetch failed"
                     )
+
+            else:
+
+                print(
+                    "[Router] "
+                    "No symbol detected"
+                )
 
         # -----------------------------------
         # 7. Forecast Layer
@@ -416,10 +451,6 @@ class Router:
 
                     prediction_context = (
 
-                        "[FORECAST]\n"
-
-                        +
-
                         self.forecast_engine
                         .build_forecast_context(
                             prediction
@@ -442,8 +473,6 @@ class Router:
                 else:
 
                     prediction_context = (
-
-                        "[FORECAST]\n"
 
                         "No forecast data "
                         "available for "
@@ -504,8 +533,6 @@ class Router:
 
                 news_context = (
 
-                    "[NEWS]\n"
-
                     f"{sentiment_data['summary']}\n\n"
 
                     f"Detected sentiment: "
@@ -524,10 +551,19 @@ class Router:
                     ] * 100
                 )
 
+            else:
+
+                print(
+                    "[Router] "
+                    "No symbol for news fetch"
+                )
+
         # -----------------------------------
         # 9. Context Fusion
         # -----------------------------------
         fused_context = self.fusion.fuse(
+
+            intent=analysis["intent"],
 
             rag_context=rag_context,
 
@@ -543,7 +579,7 @@ class Router:
         print(fused_context)
 
         # -----------------------------------
-        # 10. Final Response
+        # 10. Final Response Generation
         # -----------------------------------
         if fused_context.strip():
 
@@ -551,17 +587,22 @@ class Router:
 
                 question=question,
 
-                context=fused_context
+                context=fused_context,
+
+                intent=analysis["intent"]
             )
 
         else:
 
             final_answer = self.llm.generate(
-                question=question
+
+                question=question,
+
+                intent=analysis["intent"]
             )
 
         # -----------------------------------
-        # 11. Final confidence
+        # 11. Final Confidence
         # -----------------------------------
         final_confidence = (
 
@@ -586,13 +627,14 @@ class Router:
                 ),
 
                 prediction_confidence=(
+
                     prediction_confidence
                 )
             )
         )
 
         # -----------------------------------
-        # 12. Return
+        # 12. Return response
         # -----------------------------------
         return {
 

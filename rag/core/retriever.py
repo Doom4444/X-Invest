@@ -25,6 +25,60 @@ class Retriever:
         )
 
     # -----------------------------------
+    # Dynamic similarity threshold
+    # -----------------------------------
+    def get_similarity_threshold(
+        self,
+        intent
+    ):
+
+        threshold_map = {
+
+            # --------------------------------
+            # Precise retrieval
+            # --------------------------------
+            "forecast": 0.60,
+
+            "market_data": 0.60,
+
+            # --------------------------------
+            # Broader retrieval
+            # --------------------------------
+            "analysis": 0.50,
+
+            "general_finance": 0.45
+        }
+
+        return threshold_map.get(
+            intent,
+            0.55
+        )
+
+    # -----------------------------------
+    # Dynamic top_k
+    # -----------------------------------
+    def get_top_k(
+        self,
+        intent
+    ):
+
+        topk_map = {
+
+            "forecast": 2,
+
+            "market_data": 2,
+
+            "analysis": 5,
+
+            "general_finance": 6
+        }
+
+        return topk_map.get(
+            intent,
+            3
+        )
+
+    # -----------------------------------
     # BM25 Scoring
     # -----------------------------------
     def bm25_scores(
@@ -159,35 +213,7 @@ class Retriever:
             reverse=True
         )
 
-        documents = [
-
-            item["document"]
-
-            for item in reranked
-        ]
-
-        distances = [
-
-            item["distance"]
-
-            for item in reranked
-        ]
-
-        similarities = [
-
-            item["semantic_similarity"]
-
-            for item in reranked
-        ]
-
-        return (
-
-            documents,
-
-            distances,
-
-            similarities
-        )
+        return reranked
 
     # -----------------------------------
     # Remove duplicate chunks
@@ -196,35 +222,37 @@ class Retriever:
 
         self,
 
-        documents,
-
-        distances,
+        reranked_items,
 
         similarity_threshold=0.90
     ):
 
-        unique_documents = []
+        unique_items = []
 
-        unique_distances = []
+        for item in reranked_items:
 
-        for doc, dist in zip(
-            documents,
-            distances
-        ):
+            current_doc = item[
+                "document"
+            ]
 
             is_duplicate = False
 
             current_words = set(
 
-                self.tokenize(doc)
+                self.tokenize(
+                    current_doc
+                )
             )
 
-            for existing_doc in unique_documents:
+            for existing in unique_items:
 
                 existing_words = set(
 
                     self.tokenize(
-                        existing_doc
+
+                        existing[
+                            "document"
+                        ]
                     )
                 )
 
@@ -261,33 +289,43 @@ class Retriever:
                     break
 
             # ----------------------------
-            # Keep unique chunk
+            # Keep best unique chunk
             # ----------------------------
             if not is_duplicate:
 
-                unique_documents.append(
-                    doc
+                unique_items.append(
+                    item
                 )
 
-                unique_distances.append(
-                    dist
-                )
-
-        return (
-            unique_documents,
-            unique_distances
-        )
+        return unique_items
 
     # -----------------------------------
     # Retrieve relevant documents
     # -----------------------------------
     def retrieve(
+
         self,
+
         query: str,
-        top_k: int = 3
+
+        intent="general_finance"
     ):
 
         try:
+
+            # --------------------------------
+            # Dynamic retrieval config
+            # --------------------------------
+            top_k = self.get_top_k(
+                intent
+            )
+
+            similarity_threshold = (
+
+                self.get_similarity_threshold(
+                    intent
+                )
+            )
 
             # --------------------------------
             # Vector search
@@ -353,12 +391,7 @@ class Retriever:
             # --------------------------------
             # Hybrid reranking
             # --------------------------------
-            (
-                reranked_documents,
-                reranked_distances,
-                reranked_similarities
-
-            ) = self.rerank(
+            reranked_items = self.rerank(
 
                 query,
 
@@ -370,65 +403,58 @@ class Retriever:
             # --------------------------------
             # Confidence filtering
             # --------------------------------
-            final_documents = []
+            filtered_items = []
 
-            final_distances = []
+            for item in reranked_items:
 
-            for doc, dist, sim in zip(
+                similarity = item[
+                    "semantic_similarity"
+                ]
 
-                reranked_documents,
-
-                reranked_distances,
-
-                reranked_similarities
-            ):
+                distance = item[
+                    "distance"
+                ]
 
                 print(
 
                     f"[Retriever] "
 
-                    f"Distance: {round(dist, 3)} | "
+                    f"Distance: "
+                    f"{round(distance, 3)} | "
 
-                    f"Similarity: {round(sim, 3)}"
+                    f"Similarity: "
+                    f"{round(similarity, 3)}"
                 )
 
                 # --------------------------------
-                # Realistic threshold
+                # Dynamic threshold
                 # --------------------------------
-                if sim >= 0.55:
+                if similarity >= similarity_threshold:
 
-                    final_documents.append(
-                        doc
-                    )
-
-                    final_distances.append(
-                        dist
+                    filtered_items.append(
+                        item
                     )
 
             # --------------------------------
-            # Final fallback
+            # Fallback retrieval
             # --------------------------------
-            if not final_documents:
+            if not filtered_items:
 
                 print(
                     "[Retriever] "
-                    "No relevant chunks"
+                    "Using fallback chunk"
                 )
 
-                return [], []
+                filtered_items = [
+                    reranked_items[0]
+                ]
 
             # --------------------------------
             # Deduplicate chunks
             # --------------------------------
-            (
-                final_documents,
-                final_distances
+            filtered_items = self.deduplicate(
 
-            ) = self.deduplicate(
-
-                final_documents,
-
-                final_distances,
+                filtered_items,
 
                 similarity_threshold=0.90
             )
@@ -439,11 +465,28 @@ class Retriever:
 
                 f"Final unique chunks: "
 
-                f"{len(final_documents)}"
+                f"{len(filtered_items)}"
             )
 
             # --------------------------------
-            # Return top_k
+            # Extract final docs
+            # --------------------------------
+            final_documents = [
+
+                item["document"]
+
+                for item in filtered_items
+            ]
+
+            final_distances = [
+
+                item["distance"]
+
+                for item in filtered_items
+            ]
+
+            # --------------------------------
+            # Return final top_k
             # --------------------------------
             return (
 

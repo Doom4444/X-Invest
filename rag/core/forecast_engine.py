@@ -362,6 +362,43 @@ class ForecastEngine:
 
                 continue
 
+            # ----------------------------
+            # Confidence formatting
+            # ----------------------------
+            if key == "confidence":
+
+                value = (
+                    round(value * 100, 1)
+                )
+
+                value = f"{value}%"
+
+            # ----------------------------
+            # Expected return formatting
+            # ----------------------------
+            elif key == "expected_return":
+
+                value = (
+                    round(value * 100, 2)
+                )
+
+                value = f"{value:+.2f}%"
+
+            # ----------------------------
+            # Price formatting
+            # ----------------------------
+            elif isinstance(value, float):
+
+                if (
+                    "price" in key
+                    or "band" in key
+                ):
+
+                    value = f"${value:.2f}"
+
+            # ----------------------------
+            # Pretty key formatting
+            # ----------------------------
             pretty_key = (
 
                 key

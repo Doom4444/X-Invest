@@ -3,16 +3,75 @@ import ollama
 
 class LLMEngine:
 
-    def __init__(self, model="iKhalid/ALLaM:7b"):
+    def __init__(
+
+        self,
+
+        model="iKhalid/ALLaM:7b"
+    ):
 
         self.model = model
 
     # -----------------------------------
+    # Dynamic response length
+    # -----------------------------------
+    def get_max_tokens(
+
+        self,
+
+        intent
+    ):
+
+        token_map = {
+
+            # --------------------------------
+            # Direct factual responses
+            # --------------------------------
+            "market_data": 140,
+
+            # --------------------------------
+            # Forecast reasoning
+            # --------------------------------
+            "forecast": 220,
+
+            # --------------------------------
+            # Deeper analytical answers
+            # --------------------------------
+            "analysis": 320,
+
+            # --------------------------------
+            # Educational finance
+            # --------------------------------
+            "general_finance": 260
+        }
+
+        return token_map.get(
+            intent,
+            220
+        )
+
+    # -----------------------------------
     # Main Generation Pipeline
     # -----------------------------------
-    def generate(self, question, context=None):
+    def generate(
+
+        self,
+
+        question,
+
+        context=None,
+
+        intent="general_finance"
+    ):
 
         try:
+
+            # -----------------------------------
+            # Dynamic token control
+            # -----------------------------------
+            max_tokens = self.get_max_tokens(
+                intent
+            )
 
             # -----------------------------------
             # RAG MODE
@@ -27,6 +86,9 @@ Use the provided context as the primary source of truth.
 Instructions:
 - Answer clearly and professionally
 - Keep explanations simple for beginners
+- Keep the response concise but useful
+- Focus on the most important insights
+- Avoid unnecessary repetition
 - If financial numbers exist in the context:
   preserve them exactly
 - Do not change percentages, revenues,
@@ -62,6 +124,9 @@ Answer using general financial knowledge.
 
 Rules:
 - Explain clearly and simply
+- Keep the answer concise
+- Focus on useful information
+- Avoid unnecessary details
 - Answer directly
 - Do NOT invent financial numbers
 - Do NOT give financial advice
@@ -86,7 +151,14 @@ Answer:
                         "role": "user",
                         "content": prompt
                     }
-                ]
+                ],
+
+                options={
+
+                    "temperature": 0.2,
+
+                    "num_predict": max_tokens
+                }
             )
 
             return response["message"]["content"]
