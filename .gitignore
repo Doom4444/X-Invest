@@ -231,4 +231,7 @@ data/documents/*
 
 prediction/saved_models/*
 !prediction/saved_models/.gitkeep
-
+*.csv
+data/ml_data/*
+test_rag.py
+test_results.txt

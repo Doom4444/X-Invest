@@ -1,30 +1,77 @@
+# =========================================
 # Web Framework
+# =========================================
 fastapi>=0.111.0
 uvicorn>=0.29.0
 python-multipart>=0.0.9
 jinja2>=3.1.4
 
-# HTTP
+# =========================================
+# HTTP / APIs
+# =========================================
 requests>=2.31.0
 
+# =========================================
 # Config + Validation
+# =========================================
 python-dotenv>=1.0.1
 pydantic>=2.0.0
 
+# =========================================
 # Vector Store
-# NOTE: sentence-transformers removed — embeddings via Ollama (nomic-embed-text)
+# =========================================
 chromadb>=0.5.0
 
-# Document Parsing (for knowledge_base/ingest.py)
-pdfplumber>=0.10.0     # PDF extraction — handles multi-column and tables
-python-docx>=1.1.0     # DOCX extraction
+# =========================================
+# Ollama
+# =========================================
+ollama>=0.3.0
 
-# Market Data
-yfinance>=0.2.40
+# =========================================
+# Embedding / NLP Models
+# =========================================
+sentence-transformers>=2.7.0
+transformers>=4.40.0
+torch>=2.2.0
+dateparser>=1.2.0
 
-# Data
+# =========================================
+# Document Parsing
+# =========================================
+pdfplumber>=0.10.0
+python-docx>=1.1.0
+pypdf>=4.0.0
+openpyxl>=3.1.0
+
+# =========================================
+# Data Processing
+# =========================================
 pandas>=2.0.0
 numpy>=1.24.0
 
-# ML (Prediction module — Teammates 2+3)
+# =========================================
+# Market Data
+# =========================================
+yfinance>=0.2.40
+
+# =========================================
+# ML / Forecasting
+# =========================================
 scikit-learn>=1.4.0
+
+# =========================================
+# Utilities
+# =========================================
+tqdm>=4.66.0
+typing-extensions>=4.9.0
+charset-normalizer>=3.0.0
+
+# =========================================
+# HTML / News Parsing
+# =========================================
+beautifulsoup4>=4.12.0
+
+# =========================================
+# Retrieval Enhancements
+# =========================================
+rank-bm25>=0.2.2
