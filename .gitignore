@@ -232,3 +232,24 @@ data/documents/*
 prediction/saved_models/*
 !prediction/saved_models/.gitkeep
 
+# datasets
+data/
+*.csv
+
+# archives
+*.zip
+*.7z
+
+# ML / AI
+*.pkl
+*.pt
+*.pth
+
+# Python
+venv/
+.venv/
+__pycache__/
+
+# IDE
+.vscode/
+.idea/

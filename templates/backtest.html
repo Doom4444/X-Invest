@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-Invest - Backtest Simulator</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .backtest-main {
+            padding-top: 88px;
+            padding-inline: 1.2rem;
+            padding-bottom: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            min-height: calc(100vh - 88px);
+        }
+
+        .backtest-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .backtest-header h1 {
+            font-size: clamp(2rem, 3vw, 2.6rem);
+            letter-spacing: 0.04em;
+            margin-bottom: 0.5rem;
+        }
+
+        .backtest-header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .backtest-controls {
+            background: rgba(7, 26, 47, 0.96);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--border);
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            font-weight: 700;
+            cursor: help;
+            transition: all 0.15s;
+        }
+
+        .tooltip:hover {
+            background: var(--accent);
+            color: #020c1b;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(2, 12, 27, 0.98);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.6rem 0.8rem;
+            font-size: 0.75rem;
+            color: var(--text);
+            white-space: nowrap;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .control-group input,
+        .control-group select {
+            padding: 0.85rem 1rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: rgba(1, 9, 20, 0.96);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.15s;
+        }
+
+        .control-group input:focus,
+        .control-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+
+        .run-backtest-btn {
+            width: 100%;
+            padding: 1.1rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            border: none;
+            border-radius: var(--radius);
+            color: #020c1b;
+            font-weight: 700;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .run-backtest-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(255, 165, 2, 0.3);
+        }
+
+        .run-backtest-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(2, 12, 27, 0.3);
+            border-top-color: #020c1b;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.75rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .results-container {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .results-container.show {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background: rgba(7, 26, 47, 0.96);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            padding: 1.25rem;
+            position: relative;
+            transition: all 0.15s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent);
+            box-shadow: 0 8px 24px rgba(255, 165, 2, 0.15);
+        }
+
+        .kpi-card.positive {
+            border-left: 3px solid var(--success);
+        }
+
+        .kpi-card.negative {
+            border-left: 3px solid var(--error);
+        }
+
+        .kpi-card.neutral {
+            border-left: 3px solid var(--text-muted);
+        }
+
+        .kpi-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .kpi-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 0.35rem;
+        }
+
+        .kpi-delta {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .kpi-delta.positive {
+            color: var(--success);
+        }
+
+        .kpi-delta.negative {
+            color: var(--error);
+        }
+
+        .kpi-info {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .chart-container {
+            background: rgba(7, 26, 47, 0.96);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        #equityChart {
+            width: 100%;
+            height: 350px;
+        }
+
+        .trades-table {
+            background: rgba(7, 26, 47, 0.96);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+
+        .trades-table h3 {
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .trades-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .trades-table th,
+        .trades-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .trades-table th {
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .trades-table tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .timeout-warning {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            color: var(--error);
+            display: none;
+        }
+
+        .timeout-warning.show {
+            display: block;
+        }
+    </style>
+</head>
+
+<body class="backtest-page">
+    <!-- Top Navbar -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <div class="logo-mark">X</div>
+            <div class="logo-text"><span>Invest</span></div>
+        </div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/chat">Chat</a>
+            <a href="/market">Markets</a>
+            <a href="/backtest" class="active">Backtest</a>
+            <span class="pill"><span class="pill-dot"></span> Login (soon)</span>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="backtest-main">
+        <div class="backtest-header">
+            <h1>📊 Backtest Simulator</h1>
+            <p>Test your trading strategy with historical data and see how it would have performed</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="backtest-controls">
+            <div class="controls-grid">
+                <div class="control-group">
+                    <label class="control-label">
+                        Ticker Symbol
+                        <span class="tooltip">?
+                            <span class="tooltip-text">Select a company from the list</span>
+                        </span>
+                    </label>
+                    <select id="ticker" required>
+                        <option value="">-- Select a Company --</option>
+                        <optgroup label="Technology">
+                            <option value="AAPL">Apple Inc. (AAPL)</option>
+                            <option value="MSFT">Microsoft Corp. (MSFT)</option>
+                            <option value="GOOGL">Alphabet Inc. (GOOGL)</option>
+                            <option value="META">Meta Platforms (META)</option>
+                            <option value="NVDA">NVIDIA Corp. (NVDA)</option>
+                        </optgroup>
+                        <optgroup label="Consumer">
+                            <option value="AMZN">Amazon.com Inc. (AMZN)</option>
+                            <option value="TSLA">Tesla Inc. (TSLA)</option>
+                            <option value="HD">Home Depot (HD)</option>
+                        </optgroup>
+                        <optgroup label="Financial">
+                            <option value="JPM">JPMorgan Chase (JPM)</option>
+                            <option value="MA">Mastercard Inc. (MA)</option>
+                            <option value="V">Visa Inc. (V)</option>
+                            <option value="BRK-B">Berkshire Hathaway (BRK-B)</option>
+                        </optgroup>
+                        <optgroup label="Healthcare">
+                            <option value="JNJ">Johnson & Johnson (JNJ)</option>
+                            <option value="UNH">UnitedHealth (UNH)</option>
+                            <option value="ABBV">AbbVie Inc. (ABBV)</option>
+                            <option value="MRK">Merck & Co. (MRK)</option>
+                        </optgroup>
+                        <optgroup label="Energy & Staples">
+                            <option value="CVX">Chevron Corp. (CVX)</option>
+                            <option value="KO">Coca-Cola Co. (KO)</option>
+                            <option value="PEP">PepsiCo Inc. (PEP)</option>
+                            <option value="PG">Procter & Gamble (PG)</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label">
+                        Initial Capital ($)
+                        <span class="tooltip">?
+                            <span class="tooltip-text">Starting amount for backtest</span>
+                        </span>
+                    </label>
+                    <input type="number" id="initialCapital" value="10000" min="1000" step="1000">
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label">
+                        Start Date
+                        <span class="tooltip">?
+                            <span class="tooltip-text">Beginning of test period (min 2 years recommended)</span>
+                        </span>
+                    </label>
+                    <input type="date" id="startDate" value="2022-01-01">
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label">
+                        End Date
+                        <span class="tooltip">?
+                            <span class="tooltip-text">End of test period (usually today)</span>
+                        </span>
+                    </label>
+                    <input type="date" id="endDate">
+                </div>
+            </div>
+
+            <div class="timeout-warning" id="timeoutWarning">
+                ⚠️ Backtest is taking longer than expected. Large date ranges may require 2-3 minutes.
+            </div>
+
+            <button class="run-backtest-btn" id="runBtn" onclick="runBacktest()">
+                🚀 Run Backtest
+            </button>
+        </div>
+
+        <!-- Results -->
+        <div class="results-container" id="resultsContainer">
+            <!-- KPIs -->
+            <div class="kpi-grid" id="kpiGrid"></div>
+
+            <!-- Equity Curve Chart -->
+            <div class="chart-container">
+                <div class="chart-title">📈 Equity Curve</div>
+                <canvas id="equityChart"></canvas>
+            </div>
+
+            <!-- Trades Table -->
+            <div class="trades-table">
+                <h3>📋 Trade History</h3>
+                <table id="tradesTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Entry Price</th>
+                            <th>Exit Price</th>
+                            <th>Shares</th>
+                            <th>P&L ($)</th>
+                            <th>Return (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradesTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/backtest.js"></script>
+</body>
+
+</html>
