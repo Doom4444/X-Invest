@@ -15,7 +15,7 @@
 #   2. All 8 keys in the return dict are required — never omit any.
 #   3. "signal" must be exactly one of: bullish | neutral | bearish | unknown
 
-from prediction.model import predict_signal
+from prediction.predict import predict_signal
 
 
 def get_signal(ticker: str) -> dict:
