@@ -3,13 +3,25 @@ import uuid
 
 from rag.preprocessing.utils import load_document, clean_text, chunk_text
 from rag.core.vector_store import VectorStore
+from config import COLLECTION_NAME
 
 
 def ingest_folder(folder_path: str):
 
     vector_store = VectorStore()
+    
+    # Wipe and recreate so re-ingest is always clean
+    vector_store.client.delete_collection(COLLECTION_NAME)
+    vector_store.collection = vector_store.client.create_collection(
+        name=COLLECTION_NAME,
+        metadata={"hnsw:space": "cosine"}
+    )
 
     for file_name in os.listdir(folder_path):
+        
+        # Skip hidden files and placeholders
+        if file_name.startswith(".") or file_name == ".gitkeep":
+            continue
 
         file_path = os.path.join(folder_path, file_name)
 

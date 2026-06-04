@@ -3,6 +3,7 @@
 import ollama
 
 from typing import List, Union
+from config import EMBED_MODEL
 
 
 class EmbeddingModel:
@@ -11,7 +12,7 @@ class EmbeddingModel:
 
         self,
 
-        model_name: str = "bge-m3"
+        model_name: str = EMBED_MODEL
     ):
 
         self.model_name = model_name

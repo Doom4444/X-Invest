@@ -1,6 +1,7 @@
 import chromadb
 
 from rag.core.embeddings import EmbeddingModel
+from config import CHROMA_PATH, COLLECTION_NAME
 
 
 class VectorStore:
@@ -11,7 +12,7 @@ class VectorStore:
         # Persistent Chroma Client
         # -----------------------------------
         self.client = chromadb.PersistentClient(
-            path="db/chroma"
+            path=CHROMA_PATH
         )
 
         # -----------------------------------
@@ -30,7 +31,7 @@ class VectorStore:
 
             self.client.get_or_create_collection(
 
-                name="finance_documents",
+                name=COLLECTION_NAME,
 
                 metadata={
                     "hnsw:space": "cosine"

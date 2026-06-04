@@ -53,15 +53,30 @@ _include_routers()
 @app.get("/")
 async def home(request: Request):
     ctx = {"request": request, **_home_bg_context()}
-    return templates.TemplateResponse("index.html", ctx)
+    print(type(ctx))
+    print(ctx)
+    return templates.TemplateResponse(
+    request=request,
+    name="index.html",
+    context=ctx
+)
 
 @app.get("/chat")
 async def chat_page(request: Request):
-    return templates.TemplateResponse("chat.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="chat.html",
+        context={"request": request},
+    )
+
 
 @app.get("/market")
 async def market_page(request: Request):
-    return templates.TemplateResponse("market.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="market.html",
+        context={"request": request},
+    )
 
 @app.get("/debug/routes")
 async def debug_routes():
