@@ -36,7 +36,7 @@ def _home_bg_context() -> dict:
     return {"home_bg_file": "home-bg.png", "home_bg_version": 0}
 
 def _include_routers() -> None:
-    for module_name in ("api.chat", "api.market", "api.signal"):
+    for module_name in ("api.chat", "api.market", "api.signal", "api.backtest_api"):
         try:
             mod = __import__(module_name, fromlist=["router"])
             router = getattr(mod, "router", None)
@@ -88,3 +88,7 @@ async def debug_routes():
         if path and methods:
             paths.append({"path": path, "methods": methods})
     return {"routes": paths}
+
+@app.get("/backtest")
+async def backtest_page(request: Request):
+    return templates.TemplateResponse("backtest.html", {"request": request})

@@ -46,3 +46,21 @@ except Exception as e:
 
 print()
 print("Done.")
+print()
+print("=" * 50)
+print("TEST 4: Prediction signal in context")
+print("=" * 50)
+try:
+    from pipeline.context_builder import build_context
+    ctx = build_context("what is the signal for AAPL", "test456")
+    if "[Prediction]" in ctx:
+        print("SIGNAL FOUND in context:")
+        # print just the prediction section
+        start = ctx.find("[Prediction]")
+        print(ctx[start:start+200])
+    else:
+        print("SIGNAL NOT IN CONTEXT")
+        print("Full context sections:")
+        print(ctx[:500])
+except Exception as e:
+    print(f"ERROR: {e}")

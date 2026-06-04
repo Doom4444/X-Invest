@@ -36,7 +36,7 @@ MIN_BUY_PCT     = 0.05
 
 
 HOLDOUT_RATIO   = 0.15    
-MODEL_DIR  = "prediction/saved_models"
+MODEL_DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "saved_models")
 MODEL_PATH = os.path.join(MODEL_DIR, "signal_model.pkl")
 os.makedirs(MODEL_DIR, exist_ok=True)
 

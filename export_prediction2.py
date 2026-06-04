@@ -63,9 +63,9 @@ def _import_get_features():
             if d not in sys.path:
                 sys.path.insert(0, d)
             try:
-                import prediction.Train
-                importlib.reload(prediction.Train)
-                return prediction.Train.get_features
+                import prediction.train
+                importlib.reload(prediction.train)
+                return prediction.train.get_features
             except Exception as e:
                 print(f"  ⚠ Import from {d}: {e}")
 

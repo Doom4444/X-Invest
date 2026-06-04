@@ -7,18 +7,19 @@
 #   [Knowledge Base]     ← RAG: hybrid BM25 + semantic (rag/core/retriever.py)
 #   [Live Market Data]   ← yfinance via data_fetcher.py
 #   [Session Data]       ← online_rag.py for follow-up questions
+#   [Prediction]         ← signal_engine.py (bullish/neutral/bearish)
 
 from rag.core.retriever import Retriever
 from pipeline.entity_extractor import extract_tickers
 from pipeline.data_fetcher import get_stock_data, format_for_prompt
 from pipeline.online_rag import add_to_session, get_session_context
 
-# Instantiate once at module load — avoids rebuilding ChromaDB connection per request
 _retriever = Retriever()
 
 
 def build_context(query: str, session_id: str = "") -> str:
     sections = []
+    tickers = []
 
     # 1. Static KB — hybrid BM25 + semantic retrieval from ChromaDB
     try:
@@ -51,19 +52,14 @@ def build_context(query: str, session_id: str = "") -> str:
         if session_ctx and not any("[Live Market Data]" in s for s in sections):
             sections.append(session_ctx)
 
-    return "\n\n".join(sections) if sections else ""
-
-    # 4. Prediction signal — injected when prediction module is ready
-    # Contract: get_signal(ticker) -> dict with keys:
-    #   signal (bullish/neutral/bearish), confidence (float), rsi (float),
-    #   sma_cross (bool), disclaimer (str), error (str)
+    # 4. Prediction signal
     try:
         from prediction.signal_engine import get_signal
         if tickers:
             signal_parts = []
             for ticker in tickers:
                 sig = get_signal(ticker)
-                if sig.get("signal") != "unknown" and not sig.get("error"):
+                if sig.get("signal") not in ("unknown", "unavailable") and not sig.get("error"):
                     signal_parts.append(
                         f"[Technical Signal - {ticker}]: "
                         f"{sig['signal'].upper()} | "
@@ -74,5 +70,5 @@ def build_context(query: str, session_id: str = "") -> str:
                 sections.append("[Prediction]:\n" + "\n".join(signal_parts))
     except Exception as e:
         print(f"[ContextBuilder] Prediction signal skipped: {e}")
-    # ── END STUB ────────────────────────────────────────────────────────────
-    
+
+    return "\n\n".join(sections) if sections else ""
