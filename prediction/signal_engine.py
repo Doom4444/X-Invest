@@ -45,7 +45,7 @@ def get_signal(ticker: str) -> dict:
         return {
             "ticker":     ticker.upper(),
             "signal":     signal_map.get(result.get("signal", ""), "unknown"),
-            "confidence": result.get("confidence", 0),
+            "confidence": round(result.get("confidence", 0) * 100, 1),
             "rsi":        result.get("rsi", None),
             "sma_cross":  result.get("sma_cross", None),
             "rf_signal":  signal_map.get(result.get("rf_signal", ""), None),
