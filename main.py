@@ -53,8 +53,6 @@ _include_routers()
 @app.get("/")
 async def home(request: Request):
     ctx = {"request": request, **_home_bg_context()}
-    print(type(ctx))
-    print(ctx)
     return templates.TemplateResponse(
     request=request,
     name="index.html",
@@ -91,4 +89,8 @@ async def debug_routes():
 
 @app.get("/backtest")
 async def backtest_page(request: Request):
-    return templates.TemplateResponse("backtest.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="backtest.html",
+        context={"request": request},
+    )
