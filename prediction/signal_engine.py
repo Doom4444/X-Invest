@@ -64,4 +64,4 @@ def get_signal(ticker: str) -> dict:
             "disclaimer": "Technical analysis only. Not financial advice.",
             "error":      str(e),
         }
-    # ── END STUB ────────────────────────────────────────────────────────────
+    
