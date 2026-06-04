@@ -52,3 +52,27 @@ def build_context(query: str, session_id: str = "") -> str:
             sections.append(session_ctx)
 
     return "\n\n".join(sections) if sections else ""
+
+    # 4. Prediction signal — injected when prediction module is ready
+    # Contract: get_signal(ticker) -> dict with keys:
+    #   signal (bullish/neutral/bearish), confidence (float), rsi (float),
+    #   sma_cross (bool), disclaimer (str), error (str)
+    try:
+        from prediction.signal_engine import get_signal
+        if tickers:
+            signal_parts = []
+            for ticker in tickers:
+                sig = get_signal(ticker)
+                if sig.get("signal") != "unknown" and not sig.get("error"):
+                    signal_parts.append(
+                        f"[Technical Signal - {ticker}]: "
+                        f"{sig['signal'].upper()} | "
+                        f"Confidence: {sig['confidence']}% | "
+                        f"RSI: {sig.get('rsi', 'N/A')}"
+                    )
+            if signal_parts:
+                sections.append("[Prediction]:\n" + "\n".join(signal_parts))
+    except Exception as e:
+        print(f"[ContextBuilder] Prediction signal skipped: {e}")
+    # ── END STUB ────────────────────────────────────────────────────────────
+    
