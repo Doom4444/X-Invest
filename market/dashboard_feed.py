@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
@@ -168,10 +169,16 @@ def get_macro_snapshot() -> dict:
         "fed_rate": 5.25,
         "cpi": 3.2,
     }
-    for key, sym in _MACRO_SYMBOLS.items():
-        val, chg = _latest_close(sym)
-        macro[key] = round(val, 2)
-        macro[f"{key}_chg"] = round(chg, 2)
+    with ThreadPoolExecutor(max_workers=len(_MACRO_SYMBOLS)) as pool:
+        futures = {pool.submit(_latest_close, sym): key for key, sym in _MACRO_SYMBOLS.items()}
+        for fut in as_completed(futures):
+            key = futures[fut]
+            try:
+                val, chg = fut.result()
+                macro[key] = round(val, 2)
+                macro[f"{key}_chg"] = round(chg, 2)
+            except Exception as exc:
+                logger.warning("Failed to fetch macro indicator %s: %s", key, exc)
     return macro
 
 
@@ -215,7 +222,15 @@ def _build_ticker_row(company: dict) -> dict | None:
         return None
 
 
-def get_dashboard_snapshot(max_workers: int = 4) -> dict:
+# ── Caching Layer for Dashboard snapshot ──────────────────────────────────────
+_DASHBOARD_CACHE = None
+_LAST_CACHE_TIME = None
+_CACHE_LOCK = threading.Lock()
+_IS_REFRESHING = False
+CACHE_TTL = 300  # cache TTL in seconds (5 minutes)
+
+
+def _fetch_fresh_dashboard_data(max_workers: int = 4) -> dict:
     tickers: list[dict] = []
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {pool.submit(_build_ticker_row, c): c for c in COMPANIES}
@@ -230,6 +245,84 @@ def get_dashboard_snapshot(max_workers: int = 4) -> dict:
         "tickers": tickers,
         "updated_at": datetime.utcnow().isoformat() + "Z",
     }
+
+
+def _background_refresh():
+    global _DASHBOARD_CACHE, _LAST_CACHE_TIME, _IS_REFRESHING
+    try:
+        logger.info("Starting background refresh of dashboard data...")
+        fresh_data = _fetch_fresh_dashboard_data()
+        with _CACHE_LOCK:
+            _DASHBOARD_CACHE = fresh_data
+            _LAST_CACHE_TIME = datetime.now()
+        logger.info("Background refresh of dashboard data completed successfully.")
+    except Exception as exc:
+        logger.exception("Failed background refresh of dashboard data: %s", exc)
+    finally:
+        _IS_REFRESHING = False
+
+
+def _warm_up_cache():
+    global _DASHBOARD_CACHE, _LAST_CACHE_TIME, _IS_REFRESHING
+    _IS_REFRESHING = True
+    try:
+        logger.info("Pre-warming dashboard cache on module load...")
+        data = _fetch_fresh_dashboard_data()
+        with _CACHE_LOCK:
+            _DASHBOARD_CACHE = data
+            _LAST_CACHE_TIME = datetime.now()
+        logger.info("Dashboard cache pre-warming completed successfully.")
+    except Exception as exc:
+        logger.exception("Failed dashboard cache pre-warming: %s", exc)
+    finally:
+        _IS_REFRESHING = False
+
+
+
+
+def pre_warm_synchronously():
+    global _DASHBOARD_CACHE, _LAST_CACHE_TIME, _IS_REFRESHING
+    if _DASHBOARD_CACHE is not None:
+        return
+    logger.info("Synchronously pre-warming dashboard cache...")
+    _IS_REFRESHING = True
+    try:
+        data = _fetch_fresh_dashboard_data()
+        with _CACHE_LOCK:
+            _DASHBOARD_CACHE = data
+            _LAST_CACHE_TIME = datetime.now()
+        logger.info("Dashboard cache synchronously pre-warmed.")
+    except Exception as exc:
+        logger.exception("Failed synchronous dashboard cache pre-warming: %s", exc)
+    finally:
+        _IS_REFRESHING = False
+
+
+def get_dashboard_snapshot(max_workers: int = 4) -> dict:
+    global _DASHBOARD_CACHE, _LAST_CACHE_TIME, _IS_REFRESHING
+
+    # 1. Cold start check (fallback if the warm-up thread hasn't finished yet)
+    if _DASHBOARD_CACHE is None:
+        with _CACHE_LOCK:
+            if _DASHBOARD_CACHE is None:
+                logger.info("Dashboard cache is cold. Performing synchronous fetch...")
+                _DASHBOARD_CACHE = _fetch_fresh_dashboard_data(max_workers=max_workers)
+                _LAST_CACHE_TIME = datetime.now()
+        return _DASHBOARD_CACHE
+
+    # 2. Check if cache has expired and trigger silent background refresh if needed
+    time_since_cache = (datetime.now() - _LAST_CACHE_TIME).total_seconds()
+    if time_since_cache > CACHE_TTL:
+        if not _IS_REFRESHING:
+            with _CACHE_LOCK:
+                if not _IS_REFRESHING:
+                    _IS_REFRESHING = True
+                    logger.info("Dashboard cache expired (%.1fs ago). Triggering background refresh...", time_since_cache)
+                    t = threading.Thread(target=_background_refresh, daemon=True)
+                    t.start()
+
+    # 3. Instantly return cached data (stale-while-revalidate style)
+    return _DASHBOARD_CACHE
 
 
 def get_price_history(ticker: str, year_from: int = 2020, year_to: int = 2026) -> dict | None:

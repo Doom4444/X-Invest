@@ -1,3 +1,12 @@
+import sys
+# Ensure standard streams use UTF-8 on Windows to prevent UnicodeEncodeError
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -5,7 +14,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import os
-import sys
 import argparse
 import warnings
 import pickle
@@ -537,7 +545,7 @@ class BacktestEngine:
             return {
                 "ticker": self.ticker, "final_capital": self.initial_capital,
                 "total_trades": 0, "total_return": 0, "ann_return": 0,
-                "max_drawdown": 0, "sharpe": 0, "sharpe_active": 0,
+                "max_drawdown": 0, "max_dd": 0, "sharpe": 0, "sharpe_active": 0,
                 "sortino": 0, "calmar": 0, "win_rate": 0, "profit_factor": 0,
                 "precision_buy": 0, "avg_hold_days": 0, "expected_value": 0,
                 "bh_return": round(bh_return, 6), "alpha": 0,
@@ -598,6 +606,7 @@ class BacktestEngine:
             "total_return":  round(total_ret, 6),
             "ann_return":    round(ann_ret, 6),
             "max_drawdown":  round(max_dd, 6),
+            "max_dd":        round(max_dd, 6),
             "sharpe":        round(sharpe, 4),
             "sharpe_active": round(sharpe_active, 4),
             "sortino":       round(sortino, 4),

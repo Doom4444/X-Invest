@@ -3,6 +3,15 @@
 # Connects all routers and serves HTML pages.
 # No business logic lives here -- everything is in api/, pipeline/, market/
 
+import sys
+# Ensure standard streams use UTF-8 on Windows to prevent UnicodeEncodeError
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+
 import logging
 from pathlib import Path
 
@@ -48,6 +57,16 @@ def _include_routers() -> None:
             logger.exception("Failed to include router %s: %s", module_name, e)
 
 _include_routers()
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Pre-cache Markets dashboard data on application startup to prevent initial user delays."""
+    try:
+        from market.dashboard_feed import pre_warm_synchronously
+        pre_warm_synchronously()
+    except Exception as exc:
+        logger.exception("Failed to pre-warm dashboard cache on startup: %s", exc)
 
 
 @app.get("/")
