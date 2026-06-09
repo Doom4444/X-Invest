@@ -133,7 +133,7 @@ sequenceDiagram
 | **Runtime** | Python 3.12+ |
 | **Web server** | FastAPI 0.136, Uvicorn, Starlette |
 | **Templates** | Jinja2 |
-| **LLM & embeddings** | Ollama (`iKhalid/ALLaM:7b`, `nomic-embed-text:latest`) |
+| **LLM & embeddings** | Ollama (`iKhalid/ALLaM:7b`, `bge-m3:latest`) |
 | **Vector store** | ChromaDB (cosine HNSW) |
 | **Lexical retrieval** | rank-bm25 (hybrid reranking) |
 | **Market data** | yfinance |
@@ -242,7 +242,7 @@ All settings live in `.env` and are loaded once by `config.py`. No other module 
 |---|---|---|
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
 | `MODEL_NAME` | `iKhalid/ALLaM:7b` | Chat model |
-| `EMBED_MODEL` | `nomic-embed-text:latest` | Embedding model for ChromaDB |
+| `EMBED_MODEL` | `bge-m3:latest` | Embedding model for ChromaDB |
 | `NUM_CTX` | `4096` | Ollama context window |
 | `TEMPERATURE` | `0.3` | Sampling temperature |
 | `MAX_HISTORY` | `10` | Max conversation turns kept in memory |
@@ -688,7 +688,7 @@ See [§11.1](#111-web-api-apibacktest_apipy).
 2. Ollama running locally with models pulled:
    ```bash
    ollama pull iKhalid/ALLaM:7b
-   ollama pull nomic-embed-text:latest
+   ollama pull bge-m3:latest
    ```
 3. Optional: ingest documents, train models
 
