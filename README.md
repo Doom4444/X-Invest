@@ -3,7 +3,7 @@
 > An open-source, educational AI chatbot and trading strategy backtest simulator for stock market research.
 > Answers finance questions in **Arabic and English**, retrieves **live market data**, explains financial concepts grounded in a document knowledge base, and simulates algorithmic trading strategies.
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square)
+![Python](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-green?style=flat-square)
 ![Ollama](https://img.shields.io/badge/LLM-ALLaM%207B-orange?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)
@@ -34,7 +34,7 @@ It is **not** a financial advisor (disclaimers are automatically enforced in all
 
 | Layer | Technology |
 |---|---|
-| **Backend** | Python 3.10+, FastAPI, Uvicorn |
+| **Backend** | Python 3.12+, FastAPI, Uvicorn |
 | **LLM & Embeddings** | ALLaM 7B / bge-m3:latest via Ollama (run locally) |
 | **Vector Database** | ChromaDB (persistent local storage) |
 | **Market Data** | yfinance API |
@@ -109,7 +109,7 @@ Follow these steps to set up and run X-Invest on your local machine:
 ### 1. Prerequisites
 Ensure you have the following installed on your system:
 - **Git**
-- **Python 3.10 or 3.11**
+- **Python 3.12**
 - **Conda** (Miniconda / Anaconda) installed and activated
 - **Ollama** installed from [ollama.com](https://ollama.com)
 
@@ -130,7 +130,7 @@ Choose **one** of the options below to set up your packages:
     Run the following commands in your terminal:
     ```bash
     # Create the conda environment
-    conda create -n xinvest python=3.10 -y
+    conda create -n xinvest python=3.12 -y
     
     # Activate the environment
     conda activate xinvest
@@ -167,7 +167,7 @@ If you want the chatbot to answer questions based on your local files:
 1. Drop your `.pdf`, `.docx`, `.txt`, or `.md` files into the `data/documents/` directory.
 2. Run the ingest script to embed and save them to ChromaDB:
    ```bash
-   python -m rag.ingest
+   python -m rag.preprocessing.ingest
    ```
 
 ### Step 2: Train the Prediction Models (Required for Backtesting)
