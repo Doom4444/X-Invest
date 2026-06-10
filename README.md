@@ -10,7 +10,7 @@
 
 ---
 
-## Video Demo (Click to Play) ▶
+## Video Demo (CTRL + Left Click to keep the repo tab) ▶
 
 <!-- ============================================================
      DEMO VIDEO
