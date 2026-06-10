@@ -10,6 +10,58 @@
 
 ---
 
+## Video Demo (Click to Play) ▶
+
+<!-- ============================================================
+     DEMO VIDEO
+     Replace the line below with your actual video embed.
+
+     Option A — YouTube (recommended):
+       [![Watch the demo](docs/assets/demo-thumbnail.png)](https://www.youtube.com/watch?v=NaQNVRCQ0o4)
+
+     Option B — GitHub-hosted MP4 (drag the file into any Issue to get a URL):
+       https://user-images.githubusercontent.com/YOUR_USER_ID/YOUR_VIDEO_URL.mp4
+
+     Option C — Simple link until you record a video:
+       [▶ Watch Demo](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
+     ============================================================ -->
+
+[![Watch the X-Invest Demo](docs/assets/demo-thumbnail.png)](https://www.youtube.com/watch?v=NaQNVRCQ0o4)
+
+---
+
+## Screenshots
+
+### 🏠 Home — Landing Page
+<!-- Replace the path below with your actual screenshot after uploading to docs/assets/ -->
+![Home Page](docs/assets/screenshot-home.png)
+
+---
+
+### 💬 Chat — AI Financial Assistant
+<!-- Ideally show an Arabic query with a streamed response and live stock data visible -->
+![Chat Page](docs/assets/screenshot-chat.png)
+
+---
+
+### 📊 Markets — Live Dashboard
+<!-- Show the three-panel layout: company list + chart + financial matrix -->
+![Markets Page](docs/assets/screenshot-market.png)
+
+---
+
+### 📈 Backtest Simulator
+<!-- Show the equity curve chart, trade ledger, and metrics panel -->
+![Backtest Page](docs/assets/screenshot-backtest.png)
+
+---
+
+### 🗂️ System Architecture
+<!-- The architecture diagram — export from your architecture.html as a PNG -->
+![System Architecture](docs/assets/architecture.png)
+
+---
+
 ## What is X-Invest?
 
 X-Invest is a vertical AI assistant scoped entirely to the finance domain (it contextually refuses non-finance queries). Built as a university graduation project, it is designed to run fully locally on consumer hardware.
@@ -20,19 +72,20 @@ It is **not** a financial advisor (disclaimers are automatically enforced in all
 
 ## Key Features
 
-- **Bilingual Chat** — responds in the language of the user's query (Arabic or English).
-- **Live Stock Data** — automatically extracts stock tickers and pulls live prices, P/E, 52-week ranges, and news via `yfinance`.
-- **RAG Pipeline** — hybrid BM25 + semantic search over your local document knowledge base (CFA guides, books, etc.) using ChromaDB.
-- **Markets Dashboard** — browse 19 curated US and Middle Eastern companies (NASDAQ, NYSE, EGX, Tadawul) with an instant-load live data panel.
-- **Preloading Caching Layer** — parallel macro downloads and launch-time pre-caching for fast Markets dashboard loads.
-- **Backtest Simulator** — test strategy performance on historical data with equity charts, drawdown calculations, and a trade ledger.
-- **ML Signal Engine** — Random Forest + XGBoost ensemble predicting 5-day forward return directions (Bullish, Bearish, or Neutral).
+- **Bilingual Chat** — responds in the language of the user's query (Arabic or English)
+- **Live Stock Data** — automatically extracts stock tickers and pulls live prices, P/E, 52-week ranges, and news via `yfinance`
+- **RAG Pipeline** — hybrid BM25 + semantic search over your local document knowledge base (CFA guides, books, etc.) using ChromaDB
+- **Markets Dashboard** — browse 19 curated US and Middle Eastern companies (NASDAQ, NYSE, EGX, Tadawul) with an instant-load live data panel
+- **Preloading Caching Layer** — parallel macro downloads and launch-time pre-caching for fast Markets dashboard loads
+- **Backtest Simulator** — test strategy performance on historical data with equity charts, drawdown calculations, and a trade ledger
+- **ML Signal Engine** — Random Forest + XGBoost ensemble predicting 5-day forward return directions (Bullish, Bearish, or Neutral)
+- **Sentiment Analysis** — combined VADER + FinBERT layer for financial news sentiment scoring
 
 ---
 
 ## Quick Start
 
-Get the web app running in a few minutes. Choose a setup profile below if you need more than the defaults.
+Get the web app running in a few minutes.
 
 ### 1. Prerequisites
 
@@ -45,27 +98,21 @@ Get the web app running in a few minutes. Choose a setup profile below if you ne
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/your-username/X-Invest.git
+git clone https://github.com/Doom4444/X-Invest.git
 cd X-Invest
 
-# Create a virtual environment (pick one)
-python -m venv .venv                        # venv (all platforms)
-# conda create -n xinvest python=3.12 -y    # Conda alternative
+# Create a virtual environment
+python -m venv .venv
 
 # Activate it
-# Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# Windows (cmd):
-.venv\Scripts\activate.bat
-# macOS / Linux:
-source .venv/bin/activate
+# Windows (PowerShell):  .venv\Scripts\Activate.ps1
+# Windows (cmd):         .venv\Scripts\activate.bat
+# macOS / Linux:         source .venv/bin/activate
 
 pip install -r requirements.txt
 ```
 
 ### 3. Pull Ollama models
-
-Start the Ollama app, then pull the models referenced in `.env.example`:
 
 ```bash
 ollama pull iKhalid/ALLaM:7b
@@ -82,7 +129,7 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-The defaults work out of the box for a local Ollama install. See [Configuration](#configuration) below to customize.
+The defaults work out of the box for a local Ollama install.
 
 ### 5. Run the app
 
@@ -104,29 +151,22 @@ Open **http://localhost:8000**. On first startup, the server pre-warms market da
 
 ## Setup Profiles
 
-Pick the profile that matches what you want to run. All profiles share the same install steps above; only the optional steps and `.env` values differ.
-
 ### Profile A — Chat & Markets only (fastest)
 
-Use this to try the assistant and dashboard without training ML models or ingesting documents.
+No ML training or document ingest needed. Works immediately after Quick Start.
 
-1. Complete [Quick Start](#quick-start) steps 1–5.
-2. Skip RAG ingest and model training.
-
-**Works:** bilingual chat, live yfinance data, Markets dashboard.  
-**Limited:** no document-grounded answers (empty knowledge base), no ML signals or web backtest until models are trained.
+**Works:** bilingual chat, live yfinance data, Markets dashboard.
+**Limited:** no document-grounded answers, no ML signals or backtest.
 
 ### Profile B — Full local (recommended)
 
-Everything runs offline on your machine with no paid API keys.
-
-1. Complete [Quick Start](#quick-start).
+1. Complete Quick Start.
 2. Add finance documents to `data/documents/` (`.pdf`, `.docx`, `.txt`, `.md`).
-3. Ingest the knowledge base:
+3. Run ingest:
    ```bash
    python -m rag.preprocessing.ingest
    ```
-4. Train prediction models (required for Backtest page and chat ML signals):
+4. Train prediction models:
    ```bash
    python prediction/train.py
    ```
@@ -134,37 +174,21 @@ Everything runs offline on your machine with no paid API keys.
 
 ### Profile C — Remote Ollama server
 
-Run Ollama on another machine (e.g. a GPU server) while the app runs locally.
-
 Edit `.env`:
-
 ```env
 OLLAMA_URL=http://192.168.1.50:11434
-MODEL_NAME=iKhalid/ALLaM:7b
-EMBED_MODEL=bge-m3:latest
 ```
-
-Pull models on the **remote** host, not your laptop. Ensure port `11434` is reachable from the machine running X-Invest.
+Pull models on the **remote** host. Ensure port `11434` is reachable.
 
 ### Profile D — Alternative LLM or embedding model
-
-Swap models without code changes — set names to any model you have pulled in Ollama:
 
 ```env
 MODEL_NAME=llama3.2:latest
 EMBED_MODEL=bge-m3:latest
 ```
+Re-run ingest after changing `EMBED_MODEL`.
 
-After changing models, re-run ingest if you use RAG (`python -m rag.preprocessing.ingest`), because embeddings must match `EMBED_MODEL`.
-
-```bash
-ollama pull llama3.2:latest
-ollama pull bge-m3:latest
-```
-
-### Profile E — Low-memory / slower hardware
-
-Reduce context size and conversation history:
+### Profile E — Low-memory hardware
 
 ```env
 NUM_CTX=2048
@@ -172,27 +196,14 @@ MAX_HISTORY=6
 TEMPERATURE=0.2
 ```
 
-Use a smaller chat model if ALLaM 7B is too heavy for your GPU/RAM.
-
-### Profile F — Optional external APIs
-
-Core features use **yfinance** and **Ollama** only. These keys unlock extra news and sentiment paths; leave them blank to skip.
+### Profile F — Optional external API keys
 
 | Variable | Used by | Get a key |
 |---|---|---|
-| `FINNHUB_API_KEY` | `rag/online/news_fetcher.py`, `market_fetcher.py` | [finnhub.io](https://finnhub.io) |
-| `TWELVEDATA_API_KEY` | `rag/online/market_fetcher.py` | [twelvedata.com](https://twelvedata.com) |
-| `NEWS_API_KEY` | `prediction/Sentiment.py` | [newsapi.org](https://newsapi.org) |
-| `HF_TOKEN` | Hugging Face model downloads (FinBERT / transformers) | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
-
-Add only the keys you need to `.env`:
-
-```env
-FINNHUB_API_KEY=your_key_here
-TWELVEDATA_API_KEY=your_key_here
-NEWS_API_KEY=your_key_here
-HF_TOKEN=your_token_here
-```
+| `FINNHUB_API_KEY` | News fetcher, market fetcher | [finnhub.io](https://finnhub.io) |
+| `TWELVEDATA_API_KEY` | Market fetcher | [twelvedata.com](https://twelvedata.com) |
+| `NEWS_API_KEY` | Sentiment module | [newsapi.org](https://newsapi.org) |
+| `HF_TOKEN` | FinBERT / Hugging Face downloads | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
 
 ---
 
@@ -200,46 +211,18 @@ HF_TOKEN=your_token_here
 
 All settings are loaded from `.env` by `config.py`. Restart the server after any change.
 
-### Core settings (in `config.py`)
-
 | Variable | Default | Description |
 |---|---|---|
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
-| `MODEL_NAME` | `iKhalid/ALLaM:7b` | Chat / completion model |
-| `EMBED_MODEL` | `bge-m3:latest` | Embedding model for ChromaDB |
-| `NUM_CTX` | `4096` | Ollama context window (tokens) |
-| `TEMPERATURE` | `0.3` | Sampling temperature (0 = deterministic) |
-| `MAX_HISTORY` | `10` | Max user+assistant turn pairs kept in memory |
+| `MODEL_NAME` | `iKhalid/ALLaM:7b` | Chat model |
+| `EMBED_MODEL` | `bge-m3:latest` | Embedding model |
+| `NUM_CTX` | `4096` | Context window (tokens) |
+| `TEMPERATURE` | `0.3` | Sampling temperature |
+| `MAX_HISTORY` | `10` | Max conversation turn pairs |
 | `CHROMA_PATH` | `./db/chroma` | ChromaDB storage directory |
 | `COLLECTION_NAME` | `finance_concepts` | Chroma collection name |
 | `PROMPTS_DIR` | `./prompts` | System prompt directory |
-| `DOCS_PATH` | `./data/documents` | Folder scanned by the ingest script |
-
-### Example `.env` files
-
-**Default local setup**
-
-```env
-OLLAMA_URL=http://localhost:11434
-MODEL_NAME=iKhalid/ALLaM:7b
-EMBED_MODEL=bge-m3:latest
-CHROMA_PATH=./db/chroma
-COLLECTION_NAME=finance_concepts
-DOCS_PATH=./data/documents
-NUM_CTX=4096
-TEMPERATURE=0.3
-MAX_HISTORY=10
-PROMPTS_DIR=./prompts
-```
-
-**Custom paths** (e.g. documents on another drive)
-
-```env
-DOCS_PATH=D:/FinanceDocs
-CHROMA_PATH=D:/X-Invest/db/chroma
-```
-
-For deeper architecture and module-level detail, see [TECHNICAL.md](TECHNICAL.md).
+| `DOCS_PATH` | `./data/documents` | Knowledge base document folder |
 
 ---
 
@@ -248,14 +231,16 @@ For deeper architecture and module-level detail, see [TECHNICAL.md](TECHNICAL.md
 | Layer | Technology |
 |---|---|
 | **Backend** | Python 3.12+, FastAPI, Uvicorn |
-| **LLM & Embeddings** | ALLaM 7B + nomic-embed-text via Ollama |
-| **Vector Database** | ChromaDB (persistent local storage) |
+| **LLM** | ALLaM 7B via Ollama (Arabic-first, local) |
+| **Embeddings** | BGE-M3 via Ollama |
+| **Vector Database** | ChromaDB (persistent local) |
 | **Retrieval** | Hybrid BM25 + semantic (rank-bm25) |
 | **Market Data** | yfinance |
-| **Machine Learning** | scikit-learn, XGBoost, pandas, numpy |
+| **ML — Signal** | Random Forest + XGBoost ensemble |
+| **ML — Sentiment** | VADER + FinBERT combined layer |
 | **Frontend** | HTML5, Vanilla CSS/JS, Chart.js, Jinja2 |
 
-No LangChain or paid LLM API keys are required for core functionality.
+No LangChain. No paid LLM API keys required for core functionality.
 
 ---
 
@@ -266,7 +251,7 @@ X-Invest/
 ├── main.py                     # FastAPI entry point & page routing
 ├── config.py                   # Settings loaded from .env
 ├── requirements.txt
-├── .env.example                # Configuration template
+├── .env.example
 │
 ├── api/                        # HTTP endpoints
 │   ├── chat.py                 # Streaming chat
@@ -279,7 +264,7 @@ X-Invest/
 │
 ├── rag/
 │   ├── core/                   # Embeddings, ChromaDB, hybrid retriever
-│   ├── preprocessing/          # Document ingest (python -m rag.preprocessing.ingest)
+│   ├── preprocessing/          # Document ingest
 │   └── online/                 # Live market & news fetchers
 │
 ├── market/                     # Dashboard feeds & curated tickers
@@ -287,9 +272,18 @@ X-Invest/
 │
 ├── templates/                  # Jinja2 HTML pages
 ├── static/                     # CSS, JS, images
-├── prompts/                    # System prompt (system_prompt.txt)
+├── prompts/                    # System prompt
 ├── db/                         # ChromaDB + caches (created at runtime)
-└── data/documents/             # Your PDF/DOCX/TXT knowledge-base files
+├── data/documents/             # Your PDF/DOCX/TXT knowledge-base files
+│
+└── docs/
+    └── assets/                 # Screenshots and architecture diagram
+        ├── screenshot-home.png
+        ├── screenshot-chat.png
+        ├── screenshot-market.png
+        ├── screenshot-backtest.png
+        ├── architecture.png
+        └── demo-thumbnail.png
 ```
 
 ---
@@ -298,32 +292,25 @@ X-Invest/
 
 ### Ingest documents (RAG knowledge base)
 
-1. Place files in `data/documents/` (or set `DOCS_PATH` in `.env`).
-2. Run:
-   ```bash
-   python -m rag.preprocessing.ingest
-   ```
-3. Re-run after adding or replacing documents. The script recreates the Chroma collection for a clean slate.
+1. Place files in `data/documents/`.
+2. Run: `python -m rag.preprocessing.ingest`
+3. Re-run after adding or replacing documents.
 
-### Train prediction models (Backtest & ML signals)
+### Train prediction models
 
 ```bash
 python prediction/train.py
 ```
 
-Saves classifiers under `prediction/saved_models/`. Required for the Backtest page and `[Prediction]` context in chat.
+Saves classifiers under `prediction/saved_models/`. Required for the Backtest page and ML signals in chat.
 
----
-
-## Command-Line Backtest
-
-Run simulations without starting the web server:
+### Command-line backtest
 
 ```bash
 python prediction/backtest.py
 ```
 
-You will be prompted for tickers, date range, and starting capital. Metrics (Sharpe, drawdown, win rate) and an equity chart are printed/saved to disk.
+Prompts for ticker, date range, and starting capital. Prints Sharpe, drawdown, win rate, and saves an equity chart.
 
 ---
 
@@ -345,7 +332,6 @@ Interactive docs: **http://localhost:8000/docs**
 <summary><strong>Example: POST /api/backtest</strong></summary>
 
 Request:
-
 ```json
 {
   "ticker": "AAPL",
@@ -354,8 +340,7 @@ Request:
 }
 ```
 
-Response (abbreviated):
-
+Response:
 ```json
 {
   "success": true,
@@ -382,9 +367,9 @@ Response (abbreviated):
 | **Model not found** | `ollama pull <MODEL_NAME>` and `ollama pull <EMBED_MODEL>`. |
 | **Chat works but no document answers** | Run ingest; verify files exist under `DOCS_PATH`. |
 | **Backtest / signals unavailable** | Run `python prediction/train.py` and check `prediction/saved_models/`. |
-| **Slow first page load on Markets** | Normal on cold start — startup pre-warm takes ~10s. Subsequent loads use cache. |
-| **Unicode errors on Windows** | `main.py` sets UTF-8 on stdout; use PowerShell or Windows Terminal. |
-| **Changed embedding model** | Re-run `python -m rag.preprocessing.ingest` so vectors match the new model. |
+| **Slow first load on Markets** | Normal on cold start — pre-warm takes ~10s. Subsequent loads use cache. |
+| **Unicode errors on Windows** | Use PowerShell or Windows Terminal. |
+| **Changed embedding model** | Re-run `python -m rag.preprocessing.ingest` so vectors match. |
 
 ---
 
