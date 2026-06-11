@@ -1,7 +1,8 @@
 # X-Invest — Technical Documentation
-**Version:** MVP Phase 1  
+
+**Version:** Phase 2 (Chat · Markets · Backtest · ML Signals)  
 **Project:** BIS Graduation Project — Egypt, July 2026  
-**Stack:** Python · FastAPI · Ollama · ChromaDB · yfinance  
+**Stack:** Python · FastAPI · Ollama · ChromaDB · yfinance · scikit-learn · XGBoost
 
 ---
 
@@ -9,927 +10,738 @@
 
 1. [Project Overview](#1-project-overview)
 2. [Architecture at a Glance](#2-architecture-at-a-glance)
-3. [Layer 0 — Startup: `main.py` + `config.py`](#3-layer-0--startup-mainpy--configpy)
-4. [Layer 1 — The Browser Gets a Page](#4-layer-1--the-browser-gets-a-page)
-5. [Layer 2 — User Sends a Message: `chat.js` → `api/chat.py`](#5-layer-2--user-sends-a-message-chatjs--apichatpy)
-6. [Layer 3 — The Server Receives It: `api/chat.py`](#6-layer-3--the-server-receives-it-apichatpy)
-7. [Layer 4 — Context Assembly: `pipeline/context_builder.py`](#7-layer-4--context-assembly-pipelinecontext_builderpy)
-8. [Layer 5 — Memory: `pipeline/memory_manager.py`](#8-layer-5--memory-pipelinememory_managerpy)
-9. [Layer 6 — The LLM Call: `services/llm_service.py`](#9-layer-6--the-llm-call-servicesllm_servicepy)
-10. [Layer 7 — Streaming Back to the Browser](#10-layer-7--streaming-back-to-the-browser)
-11. [Layer 8 — Postprocessor: `pipeline/postprocessor.py`](#11-layer-8--postprocessor-pipelinepostprocessorpy)
-12. [Layer 9 — Browser Renders the Stream: `chat.js`](#12-layer-9--browser-renders-the-stream-chatjs)
-13. [The Market Page — Independent System](#13-the-market-page--independent-system)
-14. [The RAG Ingest — Offline Process: `rag/ingest.py`](#14-the-rag-ingest--offline-process-ragingestpy)
-15. [Complete Request Trace — One Full Message End to End](#15-complete-request-trace--one-full-message-end-to-end)
-16. [Module Reference](#16-module-reference)
+3. [Tech Stack & Dependencies](#3-tech-stack--dependencies)
+4. [Project Structure](#4-project-structure)
+5. [Configuration](#5-configuration)
+6. [Application Bootstrap](#6-application-bootstrap)
+7. [Chat Pipeline — End to End](#7-chat-pipeline--end-to-end)
+8. [RAG Knowledge Base](#8-rag-knowledge-base)
+9. [Markets Dashboard](#9-markets-dashboard)
+10. [Prediction & Signal Engine](#10-prediction--signal-engine)
+11. [Backtest Simulator](#11-backtest-simulator)
+12. [Frontend Pages & Scripts](#12-frontend-pages--scripts)
+13. [API Reference](#13-api-reference)
+14. [Module Reference](#14-module-reference)
+15. [Operational Notes](#15-operational-notes)
+16. [Future Work](#16-future-work)
 
 ---
 
 ## 1. Project Overview
 
-X-Invest is a vertical AI financial assistant — meaning it is intentionally scoped to finance only and refuses all other topics. The system is built entirely from scratch without frameworks like LangChain. Every component is custom-written so the architecture is fully transparent and debuggable.
+X-Invest is a **vertical AI financial assistant** — intentionally scoped to finance only. It is built from scratch without LangChain or similar frameworks so every layer is transparent and debuggable.
 
-**What makes it "vertical":**
-- The system prompt in `prompts/system_prompt.txt` explicitly instructs the model to refuse non-finance questions
-- The postprocessor enforces a disclaimer on every single response
+The system has four major capabilities:
+
+| Capability | Description |
+|---|---|
+| **Bilingual Chat** | Arabic/English Q&A grounded in documents, live prices, and ML signals |
+| **Markets Dashboard** | Curated US, EGX, and Tadawul tickers with macro strip and technical matrix |
+| **ML Signal Engine** | Random Forest + XGBoost ensemble predicting 5-day return direction |
+| **Backtest Simulator** | Web and CLI strategy simulation with equity curves and trade ledger |
+
+### Design principles
+
+**Vertical (finance-only)**
+- `prompts/system_prompt.txt` instructs the model to refuse non-finance topics
+- `pipeline/postprocessor.py` enforces a disclaimer on every response
 - The RAG knowledge base contains only finance documents
 
-**What makes it "grounded":**
-- Every response is built from three information sources: a static knowledge base, live market data, and session memory
-- The model is instructed never to invent numbers — if data is unavailable it must say so
+**Grounded (no hallucinated numbers)**
+- Context is assembled from: static KB, live yfinance data, session memory, and prediction signals
+- The system prompt forbids inventing prices or metrics
 
-**What makes it "local":**
-- The LLM (ALLaM 7B) runs on your machine via Ollama — no OpenAI API, no external calls
-- Embeddings also run locally via Ollama's nomic-embed-text model
+**Local-first**
+- LLM (ALLaM 7B) and embeddings run via Ollama on the host machine
 - ChromaDB stores vectors on disk at `db/chroma/`
-- yfinance fetches live data directly from Yahoo Finance
+- No OpenAI or paid API keys are required for core chat functionality
+
+**Educational disclaimer**
+- All outputs are for learning, not professional investment advice
 
 ---
 
 ## 2. Architecture at a Glance
 
 ```
-Browser (HTML/CSS/JS)
+Browser (HTML / CSS / Vanilla JS / Chart.js)
     │
-    │  GET /  GET /chat  GET /market    ← page loads
-    │  POST /api/chat/stream            ← chat messages
-    │  GET  /api/market/companies       ← company list
-    │  GET  /api/market/{ticker}        ← dashboard data
+    │  GET  /  /chat  /market  /backtest          ← page loads
+    │  POST /api/chat/stream                      ← streaming chat
+    │  POST /api/clear                           ← new chat
+    │  GET  /api/market/dashboard                ← cached macro + ticker matrix
+    │  GET  /api/market/{ticker}/history         ← price chart data
+    │  GET  /api/market/{ticker}/forecast        ← forecast panel
+    │  GET  /api/signal/{ticker}                 ← ML signal badge
+    │  POST /api/backtest                        ← strategy simulation
     │
 FastAPI  (main.py)
     │
-    ├── api/chat.py          ← chat endpoints
-    │     │
+    ├── api/chat.py
     │     ├── pipeline/context_builder.py
-    │     │     ├── rag/retriever.py          ← ChromaDB + MMR
+    │     │     ├── rag/core/retriever.py       ← hybrid BM25 + semantic
     │     │     ├── pipeline/entity_extractor.py
-    │     │     ├── pipeline/data_fetcher.py  ← yfinance
-    │     │     └── pipeline/online_rag.py    ← session store
-    │     │
-    │     ├── pipeline/memory_manager.py      ← conversation history
-    │     ├── services/llm_service.py         ← Ollama API
-    │     └── pipeline/postprocessor.py       ← disclaimer
+    │     │     ├── pipeline/data_fetcher.py    ← yfinance
+    │     │     ├── pipeline/online_rag.py      ← per-session live data
+    │     │     └── prediction/signal_engine.py
+    │     ├── pipeline/memory_manager.py
+    │     ├── services/llm_service.py         ← Ollama
+    │     └── pipeline/postprocessor.py
     │
-    ├── api/market.py        ← market endpoints
+    ├── api/market.py
     │     ├── market/companies.py
-    │     └── market/dashboard.py             ← yfinance
+    │     ├── market/dashboard.py
+    │     └── market/dashboard_feed.py          ← parallel fetch + cache
     │
-    └── api/signal.py        ← prediction endpoints (stub)
-          └── prediction/signal_engine.py
+    ├── api/signal.py
+    │     └── prediction/signal_engine.py
+    │
+    └── api/backtest_api.py
+          └── prediction/backtest.py            ← BacktestEngine
+```
+
+### Chat request flow (simplified)
+
+```mermaid
+sequenceDiagram
+    participant Browser as chat.js
+    participant API as api/chat.py
+    participant Ctx as context_builder
+    participant Mem as memory_manager
+    participant LLM as llm_service
+    participant Post as postprocessor
+
+    Browser->>API: POST /api/chat/stream
+    API->>Ctx: build_context(query, session_id)
+    Ctx-->>API: [KB] + [Live Data] + [Session] + [Prediction]
+    API->>Mem: add_message(user)
+    API->>LLM: stream_chat(history, context)
+    loop NDJSON tokens
+        LLM-->>Browser: token chunks
+    end
+    API->>Post: process(full_text)
+    API->>Mem: add_message(assistant)
+    API-->>Browser: x_invest_final sentinel
 ```
 
 ---
 
-## 3. Layer 0 — Startup: `main.py` + `config.py`
+## 3. Tech Stack & Dependencies
 
-When you run `uvicorn main:app --reload`, two things happen before any request arrives.
+| Layer | Technology |
+|---|---|
+| **Runtime** | Python 3.12+ |
+| **Web server** | FastAPI 0.136, Uvicorn, Starlette |
+| **Templates** | Jinja2 |
+| **LLM & embeddings** | Ollama (`iKhalid/ALLaM:7b`, `bge-m3:latest`) |
+| **Vector store** | ChromaDB (cosine HNSW) |
+| **Lexical retrieval** | rank-bm25 (hybrid reranking) |
+| **Market data** | yfinance |
+| **ML** | scikit-learn, XGBoost, pandas, numpy, scipy |
+| **Sentiment** | VADER (optional, via `prediction/Sentiment.py`) |
+| **Documents** | pypdf, pdfplumber, python-docx |
+| **Charts** | Chart.js (frontend), matplotlib (CLI backtest) |
+| **Frontend** | Vanilla HTML/CSS/JS — no React or build step |
 
-### `config.py` runs first
-
-```python
-from dotenv import load_dotenv
-import os
-load_dotenv()   # reads .env file, populates environment variables
-
-OLLAMA_URL    = os.getenv("OLLAMA_URL",    "http://localhost:11434")
-MODEL_NAME    = os.getenv("MODEL_NAME",    "iKhalid/ALLaM:7b")
-EMBED_MODEL   = os.getenv("EMBED_MODEL",   "nomic-embed-text:latest")
-NUM_CTX       = int(os.getenv("NUM_CTX",   "4096"))
-TEMPERATURE   = float(os.getenv("TEMPERATURE", "0.3"))
-MAX_HISTORY   = int(os.getenv("MAX_HISTORY",   "10"))
-CHROMA_PATH   = os.getenv("CHROMA_PATH",   "./db/chroma")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "finance_concepts")
-PROMPTS_DIR   = os.getenv("PROMPTS_DIR",   "./prompts")
-DOCS_PATH     = os.getenv("DOCS_PATH",     "./data/documents")
-```
-
-Every other file imports from here using `from config import MODEL_NAME`. No file ever calls `os.getenv()` directly. This single-source-of-truth pattern means changing the model name requires editing one line in `.env`, not hunting through 6 files.
-
-### `main.py` runs second
-
-```python
-app = FastAPI(title="X-Invest", version="1.0.0")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-```
-
-This creates the FastAPI application, mounts the `/static` folder (so the browser can request CSS/JS/images directly), and sets up Jinja2 to render HTML templates.
-
-Then it calls `_include_routers()`:
-
-```python
-def _include_routers() -> None:
-    for module_name in ("api.chat", "api.market", "api.signal"):
-        try:
-            mod = __import__(module_name, fromlist=["router"])
-            app.include_router(mod.router)
-        except Exception as e:
-            logger.exception("Failed to include router %s: %s", module_name, e)
-```
-
-This imports each `api/` file and registers its URL routes with FastAPI. The `try/except` means if one router has an import error, the other two still load — the app does not crash completely.
-
-Finally, `main.py` registers the three page routes:
-
-```python
-@app.get("/")
-async def home(request: Request):
-    ctx = {"request": request, **_home_bg_context()}
-    return templates.TemplateResponse("index.html", ctx)
-
-@app.get("/chat")
-async def chat_page(request: Request):
-    return templates.TemplateResponse("chat.html", {"request": request})
-
-@app.get("/market")
-async def market_page(request: Request):
-    return templates.TemplateResponse("market.html", {"request": request})
-```
-
-These routes contain no business logic. They just give the browser the HTML file.
+See `requirements.txt` for pinned versions.
 
 ---
 
-## 4. Layer 1 — The Browser Gets a Page
+## 4. Project Structure
 
-When you visit `http://localhost:8000/chat`, FastAPI returns `templates/chat.html`. The browser then automatically makes two more requests:
-
-- `GET /static/css/style.css` — the stylesheet (served by the StaticFiles mount)
-- `GET /static/js/chat.js` — the JavaScript
-
-Once `chat.js` is loaded, it runs immediately. The first thing it does is establish a session identity:
-
-```javascript
-const sessionId =
-  window.localStorage.getItem("xinvest_session") ||
-  (window.crypto.randomUUID && window.crypto.randomUUID()) ||
-  String(Date.now());
-window.localStorage.setItem("xinvest_session", sessionId);
 ```
-
-This UUID is the key that ties your entire conversation together on the server side. Every request you send includes it. If you refresh the page, `localStorage.getItem` returns the same UUID — that is why the server remembers your conversation across refreshes (as long as the server has not restarted, since memory is in-memory only on the server).
+X-Invest/
+│
+├── main.py                         # FastAPI entry, page routes, startup cache warmup
+├── config.py                       # Single source of truth for .env settings
+├── requirements.txt
+├── .env.example
+│
+├── api/                            # HTTP routers
+│   ├── chat.py                     # /api/chat, /api/chat/stream, /api/clear
+│   ├── market.py                   # Markets dashboard endpoints
+│   ├── signal.py                   # /api/signal/{ticker}
+│   └── backtest_api.py             # POST /api/backtest
+│
+├── pipeline/                       # Chat context & response pipeline
+│   ├── context_builder.py          # Orchestrates all context sources
+│   ├── memory_manager.py           # In-memory per-session history
+│   ├── entity_extractor.py         # Bilingual ticker detection
+│   ├── data_fetcher.py             # yfinance → LLM context
+│   ├── online_rag.py               # Volatile session-scoped live data
+│   └── postprocessor.py            # Disclaimer enforcement
+│
+├── services/
+│   └── llm_service.py              # Ollama chat + stream wrappers
+│
+├── rag/
+│   ├── core/                       # Active RAG stack (used by chat)
+│   │   ├── embeddings.py           # Ollama embedding model
+│   │   ├── vector_store.py         # ChromaDB wrapper
+│   │   ├── retriever.py            # Hybrid BM25 + semantic retrieval
+│   │   ├── rag_engine.py           # Retrieve + build context helper
+│   │   ├── context_fusion.py       # Multi-source context merger
+│   │   └── forecast_engine.py      # Forecast context builder
+│   ├── preprocessing/              # Offline document ingest
+│   │   ├── ingest.py               # python -m rag.preprocessing.ingest
+│   │   └── utils.py                # Loaders, chunking, cleaning
+│   ├── online/                     # Live market + news fetchers
+│   │   ├── asset_extractor.py
+│   │   ├── market_fetcher.py
+│   │   ├── market_verifier.py
+│   │   ├── news_fetcher.py
+│   │   └── news_analyzer.py
+│   └── ai/                         # Advanced router (not wired to main chat yet)
+│       ├── router.py
+│       ├── query_analyzer.py
+│       └── llm_engine.py
+│
+├── market/
+│   ├── companies.py                # 19 curated tickers (US, EGX, Tadawul)
+│   ├── dashboard.py                # Single-ticker yfinance snapshot
+│   └── dashboard_feed.py           # Macro strip, matrix, cache, forecasts
+│
+├── prediction/
+│   ├── train.py                    # Feature engineering + model training
+│   ├── predict.py                  # Live inference + forecast series
+│   ├── signal_engine.py            # Public get_signal() contract
+│   ├── backtest.py                 # BacktestEngine + CLI
+│   ├── Data.py                     # FinancialDataCollector
+│   ├── Sentiment.py                # Optional sentiment features
+│   └── saved_models/               # signal_model.pkl (created by train.py)
+│
+├── models/
+│   └── schemas.py                  # Pydantic request/response models
+│
+├── templates/                      # Jinja2 pages
+│   ├── index.html
+│   ├── chat.html
+│   ├── market.html
+│   └── backtest.html
+│
+├── static/
+│   ├── css/style.css
+│   └── js/                         # chat.js, market.js, backtest.js, chart.js, …
+│
+├── prompts/
+│   └── system_prompt.txt
+│
+├── future/                         # Post-MVP stubs (auth, DB, upload)
+│
+├── db/chroma/                      # ChromaDB persistence (created at runtime)
+└── data/documents/                 # Source PDFs/DOCX/TXT for RAG ingest
+```
 
 ---
 
-## 5. Layer 2 — User Sends a Message: `chat.js` → `api/chat.py`
+## 5. Configuration
 
-When you type a message and press Enter or click Send, `sendMessage()` runs.
+All settings live in `.env` and are loaded once by `config.py`. No other module calls `os.getenv()` directly.
 
-### Step 1 — Language detection
+| Variable | Default | Purpose |
+|---|---|---|
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL |
+| `MODEL_NAME` | `iKhalid/ALLaM:7b` | Chat model |
+| `EMBED_MODEL` | `bge-m3:latest` | Embedding model for ChromaDB |
+| `NUM_CTX` | `4096` | Ollama context window |
+| `TEMPERATURE` | `0.3` | Sampling temperature |
+| `MAX_HISTORY` | `10` | Max conversation turns kept in memory |
+| `CHROMA_PATH` | `./db/chroma` | ChromaDB directory |
+| `COLLECTION_NAME` | `finance_concepts` | Chroma collection name |
+| `PROMPTS_DIR` | `./prompts` | System prompt directory |
+| `DOCS_PATH` | `./data/documents` | RAG source documents |
 
-Before sending anything, the JS scans your text for Unicode character ranges:
-
-```javascript
-function detectLanguageHint(text) {
-  if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text))
-    return "The user wrote in Arabic. You MUST respond entirely in Arabic.";
-  return "";
-}
-```
-
-`\u0600-\u06FF` is the Unicode block for Arabic script. If your message contains Arabic characters, a hidden instruction gets prepended to the message that is actually sent to the backend:
-
-```
-[The user wrote in Arabic. You MUST respond entirely in Arabic.]
-ما هو سعر سهم أبل الآن؟
-```
-
-The user's bubble in the UI shows only their original text. The backend receives the augmented version. This reinforces the system prompt's language rule, because LLMs sometimes "drift" to their dominant training language under certain conditions.
-
-### Step 2 — UI updates immediately (before the fetch)
-
-Two DOM elements are created before any network request:
-
-```javascript
-createMessageRow("user", text);           // user bubble with their text
-const { bubble, meta } = createMessageRow("assistant", "");  // empty assistant bubble
-setBubble(bubble, "", true);              // true = show blinking cursor
-```
-
-The user sees their message appear instantly and an empty assistant bubble with a cursor. This is important UX — it communicates "the system received your message and is working."
-
-### Step 3 — The fetch
-
-```javascript
-const res = await fetch("/api/chat/stream", {
-  method:  "POST",
-  headers: { "Content-Type": "application/json" },
-  body:    JSON.stringify({ session_id: sessionId, message: messageToSend }),
-});
-```
-
-The request body contains the session ID and the augmented message. The response is a streaming `ReadableStream` — tokens arrive continuously rather than all at once.
+Copy `.env.example` to `.env` before first run.
 
 ---
 
-## 6. Layer 3 — The Server Receives It: `api/chat.py`
+## 6. Application Bootstrap
 
-`chat_stream_endpoint` is the orchestrator. It calls everything else in the correct order.
+### Startup sequence
 
-```python
-body       = await request.json()
-session_id = body.get("session_id", "default")
-user_query = body.get("message", "").strip()
-```
+1. `config.py` loads `.env`
+2. `main.py` creates `FastAPI(title="X-Invest", version="1.0.0")`
+3. Static files mounted at `/static`
+4. Routers loaded lazily via `_include_routers()`:
+   - `api.chat`, `api.market`, `api.signal`, `api.backtest_api`
+   - Each router is wrapped in try/except so one broken import does not kill the app
+5. `@app.on_event("startup")` calls `market.dashboard_feed.pre_warm_synchronously()`
+   - Blocks ~10 seconds on first launch while yfinance data is fetched in parallel
+   - Populates the dashboard cache before the first user request
 
-### Critical ordering — context BEFORE history
+### Page routes (no business logic)
 
-```python
-context = build_context(user_query, session_id=session_id)  # ← Step 1
-add_message(session_id, "user", user_query)                  # ← Step 2
-history = get_history(session_id)                            # ← Step 3
-```
-
-**Why this order is important:**  
-`build_context` does semantic retrieval using only the raw query. If you added the message to history first, the query vector used for RAG search would contain the noise of previous conversation turns. A pure single-message query produces cleaner, more relevant retrieval results.
-
-### The streaming generator
-
-```python
-full_response_tokens: list[str] = []
-
-def generate():
-    for chunk in stream_chat(history, context=context):
-        yield chunk    # → sent to browser immediately
-
-        # Also parse to track state server-side
-        for line in chunk.decode("utf-8").splitlines():
-            data = json.loads(line)
-            token = data.get("message", {}).get("content", "")
-            if token:
-                full_response_tokens.append(token)
-
-            if data.get("done"):
-                full_text  = "".join(full_response_tokens)
-                final_text = process(full_text)               # postprocessor
-                add_message(session_id, "assistant", final_text)
-                trim(session_id)
-                sentinel = json.dumps({
-                    "x_invest_final": True,
-                    "full_response":  final_text,
-                    "session_id":     session_id,
-                }) + "\n"
-                yield sentinel.encode("utf-8")
-
-return StreamingResponse(generate(), media_type="application/x-ndjson")
-```
-
-The generator does two things simultaneously:
-1. It yields each raw chunk from Ollama straight to the browser (low latency — tokens appear as fast as the model generates them)
-2. It also parses those same chunks to accumulate the full response, run postprocessing, save to memory, and send a final "sentinel" line
-
-The sentinel is a custom NDJSON line with `x_invest_final: true`. It carries the postprocessed, disclaimer-guaranteed version of the full response so the browser can replace the streamed text with the clean final version.
+| Route | Template | Purpose |
+|---|---|---|
+| `GET /` | `index.html` | Landing page |
+| `GET /chat` | `chat.html` | Streaming chat UI |
+| `GET /market` | `market.html` | Markets dashboard |
+| `GET /backtest` | `backtest.html` | Backtest simulator |
+| `GET /debug/routes` | JSON | Lists registered HTTP routes |
 
 ---
 
-## 7. Layer 4 — Context Assembly: `pipeline/context_builder.py`
+## 7. Chat Pipeline — End to End
 
-`build_context(query, session_id)` is the most architecturally important function in the project. It assembles the information block that gets injected into the model's input. It has three sources.
+### 7.1 Frontend (`static/js/chat.js`)
 
-### Source 1 — Static Knowledge Base (RAG) via `rag/retriever.py`
+On page load, a session UUID is created or restored from `localStorage` (`xinvest_session`). Every request includes this ID.
+
+When the user sends a message:
+
+1. **Language hint** — Arabic Unicode range detected → hidden instruction prepended to the backend message (not shown in the UI bubble)
+2. **Immediate UI** — user bubble + empty assistant bubble with blinking cursor
+3. **Streaming fetch** — `POST /api/chat/stream` with `{ session_id, message }`
+4. **NDJSON parsing** — each line is JSON; `message.content` tokens appended to the bubble
+5. **Sentinel** — final line with `x_invest_final: true` carries the post-processed full text (disclaimer guaranteed)
+
+"New Chat" calls `POST /api/clear` which wipes both `memory_manager` and `online_rag` for that session.
+
+### 7.2 API layer (`api/chat.py`)
+
+Two endpoints:
+
+| Endpoint | Mode | Used by |
+|---|---|---|
+| `POST /api/chat` | Blocking JSON | `/docs`, testing |
+| `POST /api/chat/stream` | NDJSON stream | `chat.js` (production) |
+
+**Critical ordering** (both endpoints):
 
 ```python
-chunks = retrieve(query, n_results=3)
-if chunks:
-    kb_text = "\n---\n".join(c["text"] for c in chunks)
-    sections.append(f"[Knowledge Base]:\n{kb_text}")
+context = build_context(user_query, session_id=session_id)  # 1 — pure query for RAG
+add_message(session_id, "user", user_query)                  # 2
+history = get_history(session_id)                            # 3
 ```
 
-Inside `rag/retriever.py`, `retrieve()` does the following:
+Context is built *before* the user message is added to history so RAG retrieval uses a clean query vector without conversational noise.
 
-**Step A — Embed the query**
+Streaming additionally:
+- Accumulates tokens while yielding chunks to the browser
+- On `done: true`, runs `postprocessor.process()`, saves to memory, emits sentinel
 
-```python
-r = requests.post(
-    f"{OLLAMA_URL}/api/embeddings",
-    json={"model": EMBED_MODEL, "prompt": text},
-    timeout=30
-)
-return r.json()["embedding"]   # a list of 768 floats
-```
+### 7.3 Context assembly (`pipeline/context_builder.py`)
 
-This sends your query text to Ollama's embedding endpoint. `nomic-embed-text` converts the text into a 768-dimensional vector — a list of 768 numbers that represent the meaning of the text mathematically. Semantically similar texts produce vectors that are close together in this 768-dimensional space.
+`build_context(query, session_id)` returns a multi-section string injected into the last user message by `llm_service._enrich()`.
 
-**Step B — Query ChromaDB for candidates**
+| Section | Source | When included |
+|---|---|---|
+| `[Knowledge Base]` | `rag/core/retriever.py` | ChromaDB returns relevant chunks |
+| `[Live Market Data]` | `entity_extractor` → `data_fetcher` | Tickers detected in query |
+| `[Session Live Data]` | `pipeline/online_rag.py` | Follow-up questions without new tickers |
+| `[Prediction]` | `prediction/signal_engine.py` | Tickers detected + model trained |
 
-```python
-pool_size = min(20, col.count())
-res = col.query(
-    query_embeddings=[emb],
-    n_results=pool_size,
-    include=["documents", "metadatas", "distances", "embeddings"]
-)
-```
+Each section is wrapped in try/except — a failed source never crashes the chat.
 
-ChromaDB finds the 20 most similar stored chunks by computing cosine distance between the query vector and every stored chunk's vector. This is the "candidate pool" for MMR to work from.
+### 7.4 Memory (`pipeline/memory_manager.py`)
 
-**Step C — MMR reranking**
-
-Plain top-K retrieval has a problem: the top 3 results are often nearly identical. If your document has a paragraph about P/E ratios mentioned five times, you'd get three chunks all saying the same thing.
-
-MMR (Maximal Marginal Relevance) solves this by balancing relevance with diversity:
+In-memory `defaultdict` keyed by `session_id`:
 
 ```python
-def mmr_score(i):
-    relevance  = cosine(emb, embeddings[i])
-    redundancy = max(cosine(embeddings[i], embeddings[s]) for s in selected)
-    return lambda_ * relevance - (1 - lambda_) * redundancy
-```
-
-With `lambda_ = 0.5`:
-- **Relevance** = how similar is this chunk to the query?
-- **Redundancy** = how similar is this chunk to chunks already selected?
-- **MMR score** = 50% relevance − 50% redundancy
-
-The algorithm greedily picks the candidate with the highest MMR score, adds it to the selected set, and repeats. The result is 3 chunks that are all relevant but cover different angles of the topic.
-
-A distance threshold of `1.2` filters out chunks that are not relevant enough even if they were in the top pool.
-
-### Source 2 — Live Market Data via `pipeline/entity_extractor.py` + `pipeline/data_fetcher.py`
-
-```python
-tickers = extract_tickers(query)
-for ticker in tickers:
-    data = get_stock_data(ticker)
-    fmt  = format_for_prompt(data)
-    live_parts.append(fmt)
-    add_to_session(session_id, fmt)   # store for follow-up questions
-```
-
-`extract_tickers()` uses two detection methods:
-
-```python
-# Method 1 — Regex: matches explicit uppercase tickers
-tickers.update(re.findall(r"\b[A-Z]{2,5}(?:\.[A-Z]{1,2})?\b", query))
-# Matches: AAPL, TSLA, COMI.CA, 2222.SR etc.
-# Min 2 chars to avoid matching "E" from "P/E ratio"
-# Optional .XX suffix for EGX (.CA) and Saudi (.SR) markets
-
-# Method 2 — Name dictionary lookup
-for name, ticker in KNOWN_TICKERS.items():
-    if name in query_lower or name in query:
-        tickers.add(ticker)
-# Maps: "apple" / "أبل" → "AAPL", "aramco" / "أرامكو" → "2222.SR" etc.
-```
-
-`get_stock_data()` calls `yf.Ticker(ticker).info` — a single yfinance call that returns a large dict from Yahoo Finance. It extracts the fields relevant for the LLM:
-
-```python
-return {
-    "ticker":      ticker,
-    "name":        info.get("longName", ticker),
-    "price":       info.get("currentPrice") or info.get("regularMarketPrice"),
-    "currency":    info.get("currency", "USD"),
-    "pe_ratio":    info.get("trailingPE"),
-    "market_cap":  info.get("marketCap"),
-    "week52_high": info.get("fiftyTwoWeekHigh"),
-    "week52_low":  info.get("fiftyTwoWeekLow"),
-    "change_pct":  info.get("regularMarketChangePercent"),
-    "news":        [n["title"] for n in (stock.news or [])[:3]],
-}
-```
-
-`format_for_prompt()` converts this dict into readable text that the LLM can parse:
-
-```python
-lines = [
-    f"Stock: {d['name']} ({d['ticker']})",
-    f"Current Price: {d['price']} {d['currency']}",
-    f"P/E Ratio: {d['pe_ratio']:.2f}",
-    f"Today Change: {d['change_pct']:.2f}%",
-    f"52W High: {d['week52_high']}",
-    ...
+_sessions[session_id] = [
+    {"role": "user",      "content": "..."},
+    {"role": "assistant", "content": "..."},
 ]
 ```
 
-The function also calls `add_to_session(session_id, fmt)` immediately after fetching, storing the formatted data in `online_rag.py` for follow-up questions.
+- Trimmed to `MAX_HISTORY * 2` messages (user + assistant pairs)
+- Lost on server restart (upgrade path: `future/db.py`)
 
-### Source 3 — Session Store via `pipeline/online_rag.py`
+### 7.5 LLM call (`services/llm_service.py`)
 
-```python
-session_ctx = get_session_context(session_id)
-if session_ctx and not any("[Live Market Data]" in s for s in sections):
-    sections.append(session_ctx)
-```
+- System prompt loaded once from `prompts/system_prompt.txt`
+- `chat()` — blocking `POST {OLLAMA_URL}/api/chat` with `stream: false`
+- `stream_chat()` — streaming generator yielding raw NDJSON bytes
+- Context prepended to the last user message before the Ollama call
+- Connection/timeout errors yield user-readable error lines (never silent failure)
 
-`online_rag.py` is a simple in-memory dict:
+### 7.6 Postprocessor (`pipeline/postprocessor.py`)
 
-```python
-_session_data: dict[str, list[str]] = defaultdict(list)
-```
-
-When you ask "what was Apple's price?" as a follow-up with no ticker in the message — entity extraction finds nothing and yfinance fetches nothing. But the session store still has the Apple data from your first message. The guard `not any("[Live Market Data]" in s ...)` prevents double-injecting if new live data was already found for this turn.
-
-This is called "online RAG" — volatile, session-scoped context storage as opposed to the persistent static ChromaDB knowledge base.
-
-### What the model actually sees
-
-After all three sources are assembled:
-
-```
-[Knowledge Base]:
-P/E Ratio is a valuation metric that measures how much investors pay
-per dollar of earnings. A high P/E suggests growth expectations...
----
-Earnings Per Share (EPS) represents the company's profit divided by
-the number of outstanding shares...
-
-[Live Market Data]:
-Stock: Apple Inc (AAPL)
-Current Price: 189.30 USD
-P/E Ratio: 28.54
-Today Change: -0.82%
-52W High: 199.62
-52W Low: 164.08
-Latest News: Apple reports record Q4 earnings; iPhone 16 demand strong
-```
-
-This entire block is prepended to the user's message before the LLM sees it.
+Scans the response for disclaimer keywords. If none found, appends the standard educational disclaimer block. This is a safety net — the system prompt also requests a disclaimer.
 
 ---
 
-## 8. Layer 5 — Memory: `pipeline/memory_manager.py`
+## 8. RAG Knowledge Base
 
-Conversation memory is stored in a plain Python dict at module level:
-
-```python
-_sessions: dict = defaultdict(list)
-```
-
-Each session ID maps to a list of message dicts:
-
-```python
-_sessions["uuid-abc"] = [
-    {"role": "user",      "content": "What is P/E?"},
-    {"role": "assistant", "content": "P/E ratio is a valuation metric..."},
-    {"role": "user",      "content": "Give me an example"},
-]
-```
-
-This exact format is what Ollama's `/api/chat` endpoint expects. The model reads the full history on every call — that is how it "remembers" previous messages. It is not magic; the entire conversation is literally resent on every request.
-
-The trim function prevents unbounded memory growth:
-
-```python
-def _trim(session_id: str) -> None:
-    h = _sessions[session_id]
-    if len(h) > MAX_HISTORY * 2:          # MAX_HISTORY=10, so threshold is 20 messages
-        _sessions[session_id] = h[-(MAX_HISTORY * 2):]   # keep only the last 20
-```
-
-With `MAX_HISTORY=10`, the model always sees the last 10 complete exchanges (user + assistant = 2 messages each = 20 total). Older context is dropped.
-
-**Important limitation:** Memory is in-memory only. If the server restarts, all conversation history is lost. The `future/db.py` scaffold is designed for upgrading this to persistent database storage without changing the API.
-
----
-
-## 9. Layer 6 — The LLM Call: `services/llm_service.py`
-
-`stream_chat(history, context)` is called with two arguments:
-- `history` — the full conversation list from memory_manager
-- `context` — the assembled KB + live data block from context_builder
-
-First, it enriches the messages with context:
-
-```python
-def _enrich(messages: list, context: str) -> list:
-    enriched = messages.copy()           # never modify the original
-    if context and enriched:
-        enriched[-1]["content"] = context + "\n\n" + enriched[-1]["content"]
-    return enriched
-```
-
-This prepends the context block to the last user message (index -1). The model sees:
-
-```
-[context block]
-
-ما هو سعر سهم أبل الآن؟
-```
-
-The system prompt instructs the model to use the provided data rather than inventing numbers. The context block gives it the actual data to use.
-
-Then it calls Ollama with streaming enabled:
-
-```python
-r = requests.post(
-    f"{OLLAMA_URL}/api/chat",
-    json={
-        "model":    MODEL_NAME,
-        "system":   SYSTEM_PROMPT,       # loaded from prompts/system_prompt.txt at startup
-        "messages": _enrich(messages, context),
-        "stream":   True,
-        "options":  {"temperature": TEMPERATURE, "num_ctx": NUM_CTX}
-    },
-    stream=True,
-    timeout=120
-)
-for chunk in r.iter_content(chunk_size=None):
-    yield chunk    # raw bytes, passed through as-is
-```
-
-Key parameters:
-- `temperature: 0.3` — low randomness. For a factual finance assistant, deterministic answers are more appropriate than creative ones
-- `num_ctx: 4096` — the context window. The maximum number of tokens the model can hold in its "working memory" at once. The system prompt + context block + history + new message must all fit within this limit
-- `stream: True` — Ollama sends one JSON object per line as it generates each token, rather than waiting for the full response
-
----
-
-## 10. Layer 7 — Streaming Back to the Browser
-
-The NDJSON stream from Ollama looks like this:
-
-```json
-{"message": {"role": "assistant", "content": "سهم"}, "done": false}
-{"message": {"role": "assistant", "content": " أبل"}, "done": false}
-{"message": {"role": "assistant", "content": " يتداول"}, "done": false}
-...
-{"done": true, "eval_count": 312, "eval_duration": 4200000000}
-```
-
-Each line is a complete JSON object. The content field contains one or a few tokens. The final line has `done: true` and includes performance stats.
-
-Back in `api/chat.py`, the `generate()` function simultaneously:
-1. Yields each raw chunk to the browser immediately (no buffering — minimum latency)
-2. Parses those same chunks to track the full response server-side
-
-After the `done: true` line, it appends the sentinel:
-
-```json
-{"x_invest_final": true, "full_response": "سهم أبل يتداول...\n\n---\nDisclaimer: ...", "session_id": "uuid"}
-```
-
-The `StreamingResponse` is returned with headers that disable caching and proxy buffering:
-
-```python
-return StreamingResponse(
-    generate(),
-    media_type="application/x-ndjson",
-    headers={
-        "Cache-Control":     "no-cache",
-        "X-Accel-Buffering": "no",     # prevents nginx from buffering the stream
-    }
-)
-```
-
----
-
-## 11. Layer 8 — Postprocessor: `pipeline/postprocessor.py`
-
-The simplest file in the project but an important safety net:
-
-```python
-DISCLAIMER = (
-    "\n\n---\n"
-    "Disclaimer: This information is for educational purposes only "
-    "and is not professional financial or investment advice. "
-    "Please consult a licensed financial advisor before making investment decisions."
-)
-
-def process(response: str) -> str:
-    response = response.strip()
-    keywords = ["disclaimer", "not professional", "educational purposes",
-                "financial advisor", "not financial advice",
-                "not investment advice"]
-    if not any(kw in response.lower() for kw in keywords):
-        response += DISCLAIMER
-    return response
-```
-
-The system prompt instructs the model to add a disclaimer to every response. But models occasionally forget, especially on short factual answers. This code runs unconditionally after every response. It checks whether any disclaimer-related keyword appears in the response text, and if not, appends the full disclaimer. This guarantees the legal protection text is always present regardless of model behavior.
-
----
-
-## 12. Layer 9 — Browser Renders the Stream: `chat.js`
-
-The browser reads the NDJSON stream line by line:
-
-```javascript
-const reader  = res.body.getReader();
-const decoder = new TextDecoder();
-let   buffer  = "";
-
-while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-
-    // Split on newlines — each line is one JSON object
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";    // keep incomplete last fragment for next chunk
-
-    for (const line of lines) {
-        if (!line.trim()) continue;
-        const data = JSON.parse(line);
-
-        // Backend error (e.g. Ollama unreachable)
-        if (data.error) {
-            setBubble(bubble, "Sorry, something went wrong.\n" + data.error, false);
-            return;
-        }
-
-        // Sentinel — stream fully done, replace with postprocessed version
-        if (data.x_invest_final) {
-            setBubble(bubble, data.full_response || fullText, false);
-            continue;
-        }
-
-        // Normal token — append to bubble with cursor
-        const token = data.message?.content ?? "";
-        if (token) {
-            fullText += token;
-            setBubble(bubble, fullText, true);    // true = show blinking cursor
-        }
-
-        // Ollama done flag — show token/time stats
-        if (data.done) {
-            setBubble(bubble, fullText, false);   // false = hide cursor
-            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-            meta.textContent = `Tokens: ${data.eval_count} · Time: ${elapsed}s`;
-        }
-    }
-}
-```
-
-The buffer trick is essential. A single network chunk from the browser's `ReadableStream` may contain multiple complete JSON lines, or it may cut a JSON object in half at a packet boundary. `lines.pop()` removes and saves the last (potentially incomplete) fragment, which gets prepended to the next incoming chunk. This ensures no JSON object is ever lost or malformed.
-
-`setBubble()` rewrites the entire bubble's `innerHTML` on every token:
-
-```javascript
-function setBubble(bubble, text, showCursor = false) {
-    bubble.innerHTML =
-        escapeHtml(text) +
-        (showCursor ? '<span class="cursor"></span>' : "");
-    scrollToBottom();
-}
-```
-
-`escapeHtml()` first converts the text to safe HTML (preventing XSS attacks), then appends the cursor span if still streaming. The CSS `.cursor` class animates the blink with a keyframe animation.
-
----
-
-## 13. The Market Page — Independent System
-
-The market page has zero dependency on the chat pipeline. It does not use ChromaDB, does not call the LLM, and works even if Ollama is down.
-
-**Flow when you visit `/market`:**
-
-1. Browser loads `market.html` and then `market.js`
-2. `market.js` calls `GET /api/market/companies`
-3. `api/market.py` returns the `COMPANIES` list from `market/companies.py` — a hardcoded list of 19 tickers (9 US, 5 EGX, 5 Saudi)
-4. `market.js` renders a card for each company
-
-**Flow when you click a company card:**
-
-1. `market.js` calls `GET /api/market/AAPL` (or whichever ticker)
-2. `api/market.py` calls `market/dashboard.py` → `get_dashboard_data("AAPL")`
-3. `get_dashboard_data` calls `yf.Ticker("AAPL").info` — a richer yfinance call than the chat pipeline uses
-4. Returns structured JSON with all display fields:
-   ```python
-   {
-       "price":      189.30,
-       "change":     -1.54,
-       "change_pct": -0.81,
-       "pe_ratio":   28.54,
-       "pb_ratio":   45.2,
-       "eps":        6.43,
-       "dividend":   0.0053,
-       "week52_high": 199.62,
-       "week52_low":  164.08,
-       "day_high":   190.22,
-       "day_low":    188.54,
-       "volume":     55234100,
-       "news": [{"title": "...", "link": "..."}, ...],
-   }
-   ```
-5. `market.js` renders the dashboard panel with this data
-
-**Why two separate fetchers (`data_fetcher.py` and `dashboard.py`)?**
-
-They serve different consumers:
-- `data_fetcher.py` → produces compact Arabic text strings optimized for LLM context injection, minimal fields
-- `dashboard.py` → produces full structured JSON optimized for UI rendering, all fields including links
-
-Same data source (yfinance), different output format, different purpose.
-
----
-
-## 14. The RAG Ingest — Offline Process: `rag/ingest.py`
-
-`rag/ingest.py` runs as a standalone script, not as part of the web server:
+### 8.1 Ingest (offline)
 
 ```bash
-python -m rag.ingest
+python -m rag.preprocessing.ingest
 ```
 
-It is run once (or re-run when new documents are added) to populate ChromaDB.
+Pipeline per file in `data/documents/`:
 
-### Step 1 — Read documents
+1. **Load** — PDF (`pypdf`), DOCX (`python-docx`), TXT
+2. **Clean** — `rag/preprocessing/utils.py` normalizes whitespace and artifacts
+3. **Chunk** — overlapping text splits
+4. **Embed** — Ollama `EMBED_MODEL` via `rag/core/embeddings.py` (in-memory cache per text)
+5. **Store** — ChromaDB at `CHROMA_PATH`, collection `finance_concepts`, cosine space
 
-Supports four file types:
-- **PDF** via `pdfplumber` — handles multi-column layouts and tables better than `pypdf`
-- **DOCX** via `python-docx` — extracts paragraph text
-- **TXT** — direct UTF-8 read with latin-1 fallback
-- **MD** — read and strip markdown symbols (headings `##`, bold `**`, code blocks, links) so embeddings focus on semantic content
+Re-ingest deletes and recreates the collection for a clean slate.
 
-### Step 2 — Chunk text
+### 8.2 Retrieval (online, per chat message)
 
-```python
-CHUNK_SIZE    = 400   # words per chunk
-CHUNK_OVERLAP = 50    # words shared between consecutive chunks
+`rag/core/retriever.py` implements **hybrid retrieval**:
 
-while start < len(words):
-    end        = min(start + CHUNK_SIZE, len(words))
-    chunk_text = " ".join(words[start:end])
-    chunks.append({"text": chunk_text, "source": source, "chunk_index": idx})
-    start = end - CHUNK_OVERLAP    # step back 50 words before next chunk
-```
+1. **Vector search** — ChromaDB returns `top_k * 3` candidates
+2. **Hybrid rerank** — `final_score = 0.70 × semantic_similarity + 0.30 × BM25`
+3. **Threshold filter** — intent-based similarity cutoff (default `general_finance` → 0.45)
+4. **Fallback** — if nothing passes threshold, keep best chunk
+5. **Deduplicate** — Jaccard similarity ≥ 0.90 on token sets
+6. **Return** — top `k` unique chunks (default 6 for `general_finance`)
 
-The 50-word overlap is critical. Imagine a financial concept definition that spans two paragraphs. Without overlap, it gets split in half and neither chunk contains the complete concept. With overlap, the boundary content appears in both adjacent chunks, making the full concept retrievable.
+Intent maps control precision vs. recall:
 
-400 words ≈ 600–800 tokens, which fits comfortably inside `nomic-embed-text`'s 8192-token context window.
-
-### Step 3 — Embed chunks
-
-Each chunk is sent to Ollama:
-
-```python
-r = requests.post(
-    f"{OLLAMA_URL}/api/embeddings",
-    json={"model": EMBED_MODEL, "prompt": chunk["text"]},
-    timeout=30
-)
-embedding = r.json()["embedding"]   # 768-dim vector
-```
-
-### Step 4 — Store in ChromaDB
-
-```python
-client = chromadb.PersistentClient(path=CHROMA_PATH)
-client.delete_collection(COLLECTION_NAME)   # rebuild from scratch
-col = client.create_collection(COLLECTION_NAME)
-col.add(documents=docs, embeddings=embeddings, ids=ids, metadatas=metas)
-```
-
-ChromaDB stores the text and its vector together. When `retrieve()` queries ChromaDB later, it compares the query's vector against all stored vectors and returns the most similar chunks by cosine distance.
-
-The collection is **rebuilt from scratch** every time ingest runs. This means adding new documents is safe: just drop them in and re-run. No merging logic required.
-
----
-
-## 15. Complete Request Trace — One Full Message End to End
-
-```
-User types: "ما هو سعر سهم أبل الآن؟"
-                │
-    ── chat.js ──────────────────────────────────────────────────────────
-                │
-    detectLanguageHint() → Arabic detected
-    messageToSend = "[The user wrote in Arabic. You MUST respond entirely in Arabic.]\nما هو سعر سهم أبل الآن؟"
-                │
-    createMessageRow("user", "ما هو سعر سهم أبل الآن؟")   ← user bubble appears
-    createMessageRow("assistant", "")                      ← empty bubble + cursor appears
-                │
-    fetch("POST /api/chat/stream", { session_id, message: messageToSend })
-                │
-    ── api/chat.py ──────────────────────────────────────────────────────
-                │
-    context = build_context(user_query, session_id)
-                │
-    ── pipeline/context_builder.py ──────────────────────────────────────
-                │
-        ── rag/retriever.py ─────────────────────────────────────────────
-                │
-            embed("ما هو سعر سهم أبل الآن؟")
-            → POST /api/embeddings to Ollama
-            → returns [0.023, -0.441, 0.187, ...] (768 floats)
-                │
-            ChromaDB.query(query_embeddings=[...], n_results=20)
-            → returns 20 candidate chunks with distances + embeddings
-                │
-            MMR selects 3 diverse, relevant chunks
-            → [{"text": "Apple Inc is a technology company...", "distance": 0.34},
-               {"text": "P/E Ratio measures how much investors pay...", "distance": 0.41},
-               {"text": "Stock price is determined by supply and demand...", "distance": 0.52}]
-                │
-        ── pipeline/entity_extractor.py ─────────────────────────────────
-                │
-            regex finds: []   (no uppercase tickers in Arabic text)
-            dict lookup: "أبل" → "AAPL"
-            returns: ["AAPL"]
-                │
-        ── pipeline/data_fetcher.py ─────────────────────────────────────
-                │
-            yf.Ticker("AAPL").info
-            → { currentPrice: 189.30, trailingPE: 28.54, ... }
-                │
-            format_for_prompt() →
-            "Stock: Apple Inc (AAPL)\nCurrent Price: 189.30 USD\nP/E Ratio: 28.54\n..."
-                │
-        ── pipeline/online_rag.py ───────────────────────────────────────
-                │
-            add_to_session("uuid-abc", "Stock: Apple Inc...")
-            (stored for follow-up questions in this session)
-                │
-    context = """
-    [Knowledge Base]:
-    Apple Inc is a technology company...
-    ---
-    P/E Ratio measures how much investors pay...
-    ---
-    Stock price is determined by supply and demand...
-
-    [Live Market Data]:
-    Stock: Apple Inc (AAPL)
-    Current Price: 189.30 USD
-    P/E Ratio: 28.54
-    Today Change: -0.82%
-    52W High: 199.62
-    52W Low: 164.08
-    """
-                │
-    add_message("uuid-abc", "user", user_query)
-    history = [{"role": "user", "content": "[Arabic hint]\nما هو سعر سهم أبل الآن؟"}]
-                │
-    ── services/llm_service.py ──────────────────────────────────────────
-                │
-    _enrich(history, context):
-    history[-1]["content"] = context + "\n\n" + history[-1]["content"]
-                │
-    POST http://localhost:11434/api/chat
-    {
-        model: "iKhalid/ALLaM:7b",
-        system: "You are X-Invest, a specialized educational financial assistant...",
-        messages: [{ role: "user", content: "[context block]\n\n[Arabic hint]\nما هو سعر سهم أبل الآن؟" }],
-        stream: true,
-        options: { temperature: 0.3, num_ctx: 4096 }
-    }
-                │
-    Ollama generates and streams NDJSON:
-    {"message": {"role": "assistant", "content": "سهم"}, "done": false}
-    {"message": {"role": "assistant", "content": " أبل"}, "done": false}
-    {"message": {"role": "assistant", "content": " (AAPL)"}, "done": false}
-    ...
-    {"done": true, "eval_count": 156, "eval_duration": 3800000000}
-                │
-    ── api/chat.py generate() ───────────────────────────────────────────
-                │
-    each chunk → yield to browser immediately
-    each chunk → parse, accumulate full_response_tokens
-                │
-    on done:
-        full_text  = "سهم أبل (AAPL) يتداول حالياً عند سعر 189.30 دولار..."
-        final_text = process(full_text)   ← postprocessor checks/adds disclaimer
-        add_message("uuid-abc", "assistant", final_text)
-        trim("uuid-abc")
-        yield {"x_invest_final": true, "full_response": final_text}
-                │
-    ── chat.js stream reader ────────────────────────────────────────────
-                │
-    each token chunk:
-        fullText += token
-        setBubble(bubble, fullText, true)    ← bubble updates, cursor visible
-                │
-    on done:
-        meta.textContent = "Tokens: 156 · Time: 4.2s"
-                │
-    on x_invest_final:
-        setBubble(bubble, data.full_response, false)   ← final version, cursor gone
-                │
-    User sees: Full Arabic response with live AAPL price + disclaimer
-```
-
----
-
-## 16. Module Reference
-
-| File | Purpose | Called By |
+| Intent | top_k | threshold |
 |---|---|---|
-| `main.py` | FastAPI app, router registration, page routes | Entry point |
-| `config.py` | All settings from `.env` | All modules |
-| `api/chat.py` | `/api/chat` and `/api/chat/stream` endpoints | `chat.js` |
-| `api/market.py` | `/api/market/companies` and `/api/market/{ticker}` | `market.js` |
-| `api/signal.py` | `/api/signal/{ticker}` | `market.js` |
-| `pipeline/context_builder.py` | Orchestrates all retrieval, assembles context block | `api/chat.py` |
-| `pipeline/memory_manager.py` | Per-session conversation history | `api/chat.py` |
-| `pipeline/entity_extractor.py` | Detects stock tickers in Arabic and English text | `context_builder.py` |
-| `pipeline/data_fetcher.py` | Fetches live yfinance data, formats for LLM | `context_builder.py` |
-| `pipeline/online_rag.py` | Volatile per-session store for fetched live data | `context_builder.py`, `api/chat.py` |
-| `pipeline/postprocessor.py` | Guarantees disclaimer is present in every response | `api/chat.py` |
-| `rag/retriever.py` | MMR semantic search against ChromaDB | `context_builder.py` |
-| `rag/ingest.py` | Offline: reads docs, chunks, embeds, stores in ChromaDB | Run manually |
-| `services/llm_service.py` | Ollama blocking + streaming chat client | `api/chat.py` |
-| `market/companies.py` | Curated list of 19 tickers | `api/market.py` |
-| `market/dashboard.py` | Fetches full yfinance data for Market UI panel | `api/market.py` |
-| `prediction/signal_engine.py` | Public interface for prediction module (stub) | `api/signal.py` |
-| `models/schemas.py` | Pydantic request/response validation models | `api/` files |
-| `prompts/system_prompt.txt` | ALLaM system prompt — defines bot persona and rules | `services/llm_service.py` |
-| `static/js/chat.js` | Streaming chat UI, session management, language detection | Browser |
-| `static/js/market.js` | Market page — company list and dashboard rendering | Browser |
-| `static/css/style.css` | All styles for all 3 pages | Browser |
+| `forecast` | 2 | 0.60 |
+| `market_data` | 2 | 0.60 |
+| `analysis` | 5 | 0.50 |
+| `general_finance` | 6 | 0.45 |
+
+### 8.3 Session-scoped live data (`pipeline/online_rag.py`)
+
+Separate from the static KB. When live stock data is fetched for a ticker, formatted text is stored per `session_id`. Follow-up questions like "what about its P/E?" can use cached session data without re-detecting tickers.
+
+### 8.4 Advanced RAG router (`rag/ai/router.py`)
+
+A fuller pipeline exists with query analysis, news fetching, market verification, context fusion, and forecast engine. **It is not currently wired to `api/chat.py`** — the production chat path uses the simpler `context_builder` + `retriever` stack. The router is available for future integration or standalone experimentation.
 
 ---
 
-*Documentation covers MVP Phase 1. Prediction module (prediction/signal_engine.py) is stubbed and covered under a separate implementation document.*
+## 9. Markets Dashboard
+
+### 9.1 Curated universe (`market/companies.py`)
+
+19 companies across NASDAQ, NYSE, EGX (`.CA` suffix), and Tadawul (`.SR` suffix). Each entry includes bilingual names, sector, and flag emoji.
+
+### 9.2 Dashboard feed (`market/dashboard_feed.py`)
+
+**Macro strip** — parallel ThreadPoolExecutor fetches:
+`^VIX`, `^GSPC`, `^TNX`, `CL=F`, `GC=F`, `BTC-USD`, `DX-Y.NYB`
+
+**Ticker matrix** — for each company, `prediction/train.get_features()` computes:
+close, 1d/5d returns, RSI, MACD, Bollinger %B, ATR, stochastic, trend strength, signal (bullish/neutral/bearish derived from indicators)
+
+**Caching layer**
+
+| Property | Value |
+|---|---|
+| TTL | 300 seconds (5 minutes) |
+| Strategy | Stale-while-revalidate |
+| Cold start | Synchronous fetch on startup via `pre_warm_synchronously()` |
+| Refresh | Background thread when cache expires |
+
+`GET /api/market/dashboard` returns cached data instantly; refresh happens silently in the background.
+
+### 9.3 Per-ticker endpoints
+
+| Endpoint | Data |
+|---|---|
+| `GET /api/market/{ticker}/history?from=&to=` | Daily close + volume for Chart.js |
+| `GET /api/market/{ticker}/forecast` | ML forecast series or log-drift fallback |
+| `GET /api/market/{ticker}` | Legacy single-ticker yfinance snapshot |
+| `GET /api/market/companies` | Curated list JSON |
+
+---
+
+## 10. Prediction & Signal Engine
+
+### 10.1 Training (`prediction/train.py`)
+
+```bash
+python prediction/train.py
+```
+
+- Downloads historical OHLCV via yfinance for 20 default US tickers
+- `FinancialDataCollector` (`Data.py`) computes 50+ technical, macro, and cross-asset features
+- Labels: 5-day forward return direction (Bullish / Neutral / Bearish) with adaptive threshold
+- Models: Random Forest + XGBoost ensemble with time-series CV (gap-aware splits)
+- Output: `prediction/saved_models/signal_model.pkl` (global + optional per-ticker models)
+
+Key hyperparameters: `LOOKAHEAD=5`, `N_CV_SPLITS=5`, `GAP_DAYS=5`, winsorized features, calibrated thresholds.
+
+### 10.2 Inference (`prediction/predict.py`)
+
+`predict_signal(ticker)` returns:
+
+- `signal` — `BUY` / `HOLD` / `SELL`
+- `confidence`, `rsi`, `sma_cross`, `rf_signal`
+- `forecast_series` — price bands for the forecast panel
+- `current_price`, `price_target`, `direction`
+
+Uses per-ticker models when available, otherwise falls back to the global model.
+
+### 10.3 Public contract (`prediction/signal_engine.py`)
+
+`get_signal(ticker)` is the **only** function other modules should call. It:
+
+- Maps `BUY/HOLD/SELL` → `bullish/neutral/bearish`
+- **Never raises** — errors go in the `error` key
+- Always returns all 8 required keys
+
+Called by:
+- `api/signal.py` → `GET /api/signal/{ticker}`
+- `pipeline/context_builder.py` → chat context injection
+
+---
+
+## 11. Backtest Simulator
+
+### 11.1 Web API (`api/backtest_api.py`)
+
+`POST /api/backtest`
+
+```json
+{
+  "ticker": "AAPL",
+  "initial_capital": 10000.0,
+  "start": "2024-01-01",
+  "end": "2025-12-31"
+}
+```
+
+Delegates to `prediction/backtest.py` → `BacktestEngine`.
+
+### 11.2 BacktestEngine
+
+Simulates a long-only strategy driven by ML signals with:
+
+| Parameter | Default | Purpose |
+|---|---|---|
+| `commission` | 0.1% | Per-trade cost |
+| `slippage` | 0.05% | Execution slippage |
+| `max_hold_days` | 8 | Max position duration |
+| `cooldown_days` | 2 | Wait after exit |
+| `stop_loss_pct` | 5% | Hard stop |
+| `take_profit_pct` | 10% | Take profit |
+
+Uses `ExpandingWindowSignalGenerator` — recalculates features on a rolling basis to reduce look-ahead bias. Includes leakage validation warnings.
+
+Returns: `equity` curve, `trades` ledger, `metrics` (Sharpe, max drawdown, win rate, profit factor, etc.).
+
+### 11.3 CLI backtest
+
+```bash
+python prediction/backtest.py
+```
+
+Interactive prompts for tickers, date range, and capital. Saves equity chart PNG to disk.
+
+### 11.4 Frontend (`static/js/backtest.js`)
+
+`templates/backtest.html` + Chart.js renders equity curve, metrics cards, and trade table from the API response.
+
+---
+
+## 12. Frontend Pages & Scripts
+
+| Page | Template | Key JS | API calls |
+|---|---|---|---|
+| Home | `index.html` | — | — |
+| Chat | `chat.html` | `chat.js` | `/api/chat/stream`, `/api/clear` |
+| Markets | `market.html` | `market.js`, `chart.js`, `company_panel.js`, `render.js` | `/api/market/dashboard`, history, forecast, signal |
+| Backtest | `backtest.html` | `backtest.js` | `/api/backtest` |
+
+No bundler or npm step — static assets are served directly from `/static`.
+
+---
+
+## 13. API Reference
+
+### Chat
+
+#### `POST /api/chat/stream`
+
+Streaming chat (production).
+
+**Request**
+```json
+{ "session_id": "uuid", "message": "What is EPS?" }
+```
+
+**Response** — NDJSON lines:
+```json
+{"message": {"role": "assistant", "content": "Earnings"}, "done": false}
+{"done": true, "eval_count": 312}
+{"x_invest_final": true, "full_response": "...with disclaimer...", "session_id": "uuid"}
+```
+
+#### `POST /api/chat`
+
+Blocking fallback. Returns `{ "response": "...", "session_id": "uuid" }`.
+
+#### `POST /api/clear`
+
+Clears session memory and online RAG. Returns `{ "status": "cleared" }`.
+
+### Markets
+
+#### `GET /api/market/dashboard`
+
+Cached macro + ticker matrix. Returns `{ "macro": {...}, "tickers": [...], "updated_at": "..." }`.
+
+#### `GET /api/market/{ticker}/history?from=2020&to=2026`
+
+Price history for charts.
+
+#### `GET /api/market/{ticker}/forecast`
+
+Forecast panel with signal, direction, price target, and band series.
+
+#### `GET /api/signal/{ticker}`
+
+```json
+{
+  "ticker": "AAPL",
+  "signal": "bullish",
+  "confidence": 72.3,
+  "rsi": 58.1,
+  "sma_cross": true,
+  "rf_signal": "bullish",
+  "disclaimer": "Technical analysis only. Not financial advice.",
+  "error": ""
+}
+```
+
+### Backtest
+
+#### `POST /api/backtest`
+
+See [§11.1](#111-web-api-apibacktest_apipy).
+
+---
+
+## 14. Module Reference
+
+### Entry & config
+
+| Module | Responsibility |
+|---|---|
+| `main.py` | App factory, router inclusion, page routes, startup warmup |
+| `config.py` | Environment variable loading |
+
+### API routers
+
+| Module | Routes |
+|---|---|
+| `api/chat.py` | Chat stream, blocking chat, clear session |
+| `api/market.py` | Dashboard, history, forecast, companies |
+| `api/signal.py` | ML signal per ticker |
+| `api/backtest_api.py` | Web backtest simulation |
+
+### Chat pipeline
+
+| Module | Responsibility |
+|---|---|
+| `pipeline/context_builder.py` | Assembles all context sections |
+| `pipeline/memory_manager.py` | Per-session conversation history |
+| `pipeline/entity_extractor.py` | Regex + bilingual name → ticker map |
+| `pipeline/data_fetcher.py` | yfinance snapshot formatting |
+| `pipeline/online_rag.py` | Session-scoped live data cache |
+| `pipeline/postprocessor.py` | Disclaimer enforcement |
+| `services/llm_service.py` | Ollama chat + stream |
+
+### RAG
+
+| Module | Responsibility |
+|---|---|
+| `rag/preprocessing/ingest.py` | Offline document → ChromaDB |
+| `rag/preprocessing/utils.py` | Loaders, chunking, cleaning |
+| `rag/core/embeddings.py` | Ollama embedding with cache |
+| `rag/core/vector_store.py` | ChromaDB add/search |
+| `rag/core/retriever.py` | Hybrid BM25 + semantic retrieval |
+| `rag/ai/router.py` | Advanced multi-source router (future) |
+
+### Markets
+
+| Module | Responsibility |
+|---|---|
+| `market/companies.py` | Curated ticker list |
+| `market/dashboard.py` | Single-ticker yfinance snapshot |
+| `market/dashboard_feed.py` | Macro + matrix + cache + forecasts |
+
+### Prediction
+
+| Module | Responsibility |
+|---|---|
+| `prediction/train.py` | Feature engineering, training, `get_features()` |
+| `prediction/predict.py` | Inference, forecast series |
+| `prediction/signal_engine.py` | Public `get_signal()` API |
+| `prediction/backtest.py` | `BacktestEngine`, CLI backtester |
+| `prediction/Data.py` | `FinancialDataCollector` |
+
+### Models & prompts
+
+| Module | Responsibility |
+|---|---|
+| `models/schemas.py` | Pydantic models (optional validation layer) |
+| `prompts/system_prompt.txt` | ALLaM system instructions |
+
+---
+
+## 15. Operational Notes
+
+### Prerequisites
+
+1. Python 3.12+ with dependencies from `requirements.txt`
+2. Ollama running locally with models pulled:
+   ```bash
+   ollama pull iKhalid/ALLaM:7b
+   ollama pull bge-m3:latest
+   ```
+3. Optional: ingest documents, train models
+
+### Run the server
+
+```bash
+uvicorn main:app --reload
+```
+
+Open `http://localhost:8000`.
+
+### First-run checklist
+
+| Step | Command | Required for |
+|---|---|---|
+| Ingest documents | `python -m rag.preprocessing.ingest` | RAG-grounded answers |
+| Train models | `python prediction/train.py` | Signals, forecasts, backtest |
+
+### Ticker formats
+
+| Market | Format | Example |
+|---|---|---|
+| US | `TICKER` | `AAPL`, `MSFT` |
+| Egypt (EGX) | `TICKER.CA` | `COMI.CA` |
+| Saudi (Tadawul) | `TICKER.SR` | `2222.SR` |
+
+### Known limitations
+
+- **Server memory is volatile** — conversations are lost on restart
+- **Dashboard cache** — first startup blocks ~10s; subsequent loads are instant
+- **yfinance rate limits** — parallel fetches may occasionally return empty data
+- **Windows UTF-8** — `main.py` and `backtest.py` reconfigure stdout to UTF-8
+- **Router resilience** — a failed router import is logged but does not stop other routers
+
+---
+
+## 16. Future Work
+
+Stubs in `future/` outline post-MVP upgrades:
+
+| Module | Planned capability |
+|---|---|
+| `future/db.py` | Persist chat history (drop-in replacement for `memory_manager`) |
+| `future/auth.py` | User authentication |
+| `future/upload.py` | User document upload for RAG |
+
+Additional roadmap items:
+
+- Wire `rag/ai/router.py` into the main chat path for news-aware responses
+- Adopt `models/schemas.py` Pydantic validation in all API endpoints
+- Dynamic company screener replacing hardcoded `COMPANIES` list
+- Persistent session store (Redis or SQLite)
+
+---
+
+*Last updated: June 2026*

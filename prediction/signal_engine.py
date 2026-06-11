@@ -15,38 +15,53 @@
 #   2. All 8 keys in the return dict are required — never omit any.
 #   3. "signal" must be exactly one of: bullish | neutral | bearish | unknown
 
-from prediction.model import predict_signal
+# prediction/signal_engine.py
+from prediction.predict import predict_signal as _predict
 
 
 def get_signal(ticker: str) -> dict:
-    """
-    Public interface for the prediction module.
-    Takes a ticker string, returns a signal dict.
+    try:
+        result = _predict(ticker)
+        if result is None:
+            return {
+                "ticker":     ticker.upper(),
+                "signal":     "unknown",
+                "confidence": 0,
+                "rsi":        None,
+                "sma_cross":  None,
+                "rf_signal":  None,
+                "disclaimer": "Prediction model is not trained yet. Run train.py first.",
+                "error":      "model not loaded",
+            }
 
-    Return structure (ALL 8 keys required, NEVER raise):
-    {
-        "ticker":     str,
-        "signal":     "bullish" | "neutral" | "bearish" | "unknown",
-        "confidence": float (0–100),
-        "rsi":        float | None,
-        "sma_cross":  bool  | None,
-        "rf_signal":  str   | None,
-        "disclaimer": str,           # must be non-empty
-        "error":      str,           # empty string "" if no error
-    }
+        # Map their signal names to the contract
+        # predict.py returns BUY/HOLD/SELL — contract requires bullish/neutral/bearish
+        signal_map = {
+            "BUY":  "bullish",
+            "HOLD": "neutral",
+            "SELL": "bearish",
+        }
 
-    STUB — Prediction C replaces this body with the real implementation.
-    The return structure must stay exactly as shown.
-    """
-    # ── STUB: returns unavailable so the API works without crashing ────────
-    return {
-        "ticker":     ticker.upper(),
-        "signal":     "unavailable",
-        "confidence": 0,
-        "rsi":        None,
-        "sma_cross":  None,
-        "rf_signal":  None,
-        "disclaimer": "Prediction module is under development.",
-        "error":      "not implemented",
-    }
-    # ── END STUB ────────────────────────────────────────────────────────────
+        return {
+            "ticker":     ticker.upper(),
+            "signal":     signal_map.get(result.get("signal", ""), "unknown"),
+            "confidence": round(result.get("confidence", 0) * 100, 1),
+            "rsi":        result.get("rsi", None),
+            "sma_cross":  result.get("sma_cross", None),
+            "rf_signal":  signal_map.get(result.get("rf_signal", ""), None),
+            "disclaimer": "Technical analysis only. Not financial advice.",
+            "error":      "",
+        }
+
+    except Exception as e:
+        return {
+            "ticker":     ticker.upper(),
+            "signal":     "unknown",
+            "confidence": 0,
+            "rsi":        None,
+            "sma_cross":  None,
+            "rf_signal":  None,
+            "disclaimer": "Technical analysis only. Not financial advice.",
+            "error":      str(e),
+        }
+    

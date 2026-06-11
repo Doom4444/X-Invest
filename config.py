@@ -15,7 +15,7 @@ load_dotenv()
 # ── Ollama ────────────────────────────────────────────────────────────────────
 OLLAMA_URL    = os.getenv("OLLAMA_URL",    "http://localhost:11434")
 MODEL_NAME    = os.getenv("MODEL_NAME",    "iKhalid/ALLaM:7b")
-EMBED_MODEL   = os.getenv("EMBED_MODEL",   "nomic-embed-text:latest")
+EMBED_MODEL   = os.getenv("EMBED_MODEL",   "bge-m3:latest")
 
 # ── Model Behavior ────────────────────────────────────────────────────────────
 NUM_CTX       = int(os.getenv("NUM_CTX",       "4096"))

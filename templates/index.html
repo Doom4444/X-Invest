@@ -1,110 +1,107 @@
 <!DOCTYPE html>
-<!-- Owner: Teammate 4 | Home / landing page for X‑Invest -->
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>X‑Invest – Home</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/css/style.css" />
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-Invest | Home</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="data:,">
     <style>
-      body.home-page {
-        background:
-          radial-gradient(circle at top, rgba(6, 21, 42, 0.9) 0, rgba(2, 12, 27, 0.95) 40%, rgba(0, 0, 0, 0.98) 100%),
-          url('/static/img/{{ home_bg_file }}?v={{ home_bg_version }}');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-      }
+        /* Hero section specific styles */
+        .hero-section {
+            min-height: calc(100vh - 64px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .hero-content h1 {
+            font-size: clamp(3rem, 5vw, 5rem);
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ffffff, #ffa502);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-content p {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 2rem;
+            line-height: 1.6;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.8rem 2rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #020c1b;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(255, 165, 2, 0.3);
+        }
+
+        .btn-secondary {
+            border: 2px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
     </style>
-  </head>
-  <body class="home-page">
-    <!-- Shared navbar (logo left, links right) -->
-    <header class="navbar">
-      <div class="navbar-left">
-        <a href="/">
-          <div class="logo-mark">X</div>
-        </a>
-        <a href="/" class="logo-text">
-          <span>Invest</span>
-        </a>
-      </div>
-      <nav class="nav-links">
-        <a href="/">Home</a>
-        <a href="/chat">Chat</a>
-        <a href="/market">Markets</a>
-        <a href="#" class="pill">
-          <span class="pill-dot"></span>
-          <span>Login (soon)</span>
-        </a>
-      </nav>
-    </header>
+</head>
 
-    <main class="home-main">
-      <section class="home-hero">
-        <div class="home-hero-copy">
-          <h1>
-            Smart investing with
-            <span>X‑Invest</span>
-          </h1>
-          <p>
-            An AI‑powered assistant focused only on finance and markets, built on your X‑Invest
-            research and signals.
-          </p>
-
-          <div class="home-hero-badges">
-            <div class="badge">
-              <strong>Arabic + English</strong> market coverage
-            </div>
-            <div class="badge">
-              <strong>Real data</strong> + custom signals
-            </div>
-          </div>
-
-          <div class="home-actions">
-            <button
-              class="btn btn-primary"
-              type="button"
-              onclick="window.location.href='/chat'"
-            >
-              Continue as guest
-            </button>
-            <button class="btn btn-outline" type="button">
-              Login (coming soon)
-            </button>
-          </div>
+<body class="home-page">
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <div class="logo-mark">X</div>
+            <div class="logo-text"><span>Invest</span></div>
         </div>
+        <div class="nav-links">
+            <a href="/" class="active">Home</a>
+            <a href="/chat">Chat</a>
+            <a href="/market">Markets</a>
+            <a href="/backtest">Backtest</a>
+            <span class="pill"><span class="pill-dot"></span> Login (soon)</span>
+        </div>
+    </nav>
 
-        <aside class="home-hero-right">
-          <div class="home-card" aria-hidden="true">
-            <div class="home-card-header">
-              <div class="home-card-title">Sample portfolio snapshot</div>
-              <div class="home-card-chip">Live demo</div>
+    <!-- Hero Content -->
+    <main class="hero-section">
+        <div class="hero-content">
+            <h1>Smart Financial Intelligence</h1>
+            <p>
+                Analyze markets, chat with an AI financial assistant, and backtest your trading strategies with
+                institutional-grade metrics.
+            </p>
+            <div class="cta-buttons">
+                <a href="/chat" class="btn btn-primary">🚀 Start Chatting</a>
+                <a href="/market" class="btn btn-secondary">📊 View Markets</a>
+                <a href="/backtest" class="btn btn-secondary">⚡ Run Backtest</a>
             </div>
-            <div class="home-card-balance">$125,430</div>
-            <div class="home-card-sub">
-              <span class="pill-positive">+4,820 (this month)</span>
-            </div>
-            <div class="home-card-grid">
-              <div class="home-small-card">
-                <span>Active positions</span>
-                <span>12</span>
-              </div>
-              <div class="home-small-card">
-                <span>Risk score</span>
-                <span class="pill-soft">Balanced</span>
-              </div>
-              <div class="home-small-card">
-                <span>Top market</span>
-                <span>NASDAQ</span>
-              </div>
-              <div class="home-small-card">
-                <span>Focus</span>
-                <span>Equities &amp; ETFs</span>
-              </div>
-            </div>
-          </div>
-        </aside>
-      </section>
+        </div>
     </main>
-  </body>
+</body>
+
 </html>

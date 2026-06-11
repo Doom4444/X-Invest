@@ -1,30 +1,95 @@
-# Web Framework
-fastapi>=0.111.0
-uvicorn>=0.29.0
-python-multipart>=0.0.9
-jinja2>=3.1.4
+# ==========================================
+# Core Server
+# ==========================================
+fastapi==0.136.3
+Jinja2==3.1.6
+pydantic==2.13.4
+pydantic-settings==2.14.1
+python-dotenv==1.2.2
+python-multipart==0.0.30
+uvicorn==0.48.0
+starlette==1.2.1
 
-# HTTP
-requests>=2.31.0
+# ==========================================
+# LLM & AI
+# ==========================================
+ollama==0.6.2
 
-# Config + Validation
-python-dotenv>=1.0.1
-pydantic>=2.0.0
+# ==========================================
+# Vector Store & RAG
+# ==========================================
+chromadb==1.5.9
+rank-bm25==0.2.2
 
-# Vector Store
-# NOTE: sentence-transformers removed — embeddings via Ollama (nomic-embed-text)
-chromadb>=0.5.0
+# ==========================================
+# Financial Data
+# ==========================================
+requests==2.34.2
+yfinance==1.4.1
 
-# Document Parsing (for knowledge_base/ingest.py)
-pdfplumber>=0.10.0     # PDF extraction — handles multi-column and tables
-python-docx>=1.1.0     # DOCX extraction
+# ==========================================
+# Machine Learning
+# ==========================================
+numpy==2.4.6
+pandas==2.3.3
+scikit-learn==1.9.0
+scipy==1.17.1
+xgboost==3.2.0
 
-# Market Data
-yfinance>=0.2.40
+# ==========================================
+# Sentiment Analysis
+# ==========================================
+vaderSentiment==3.3.2
 
-# Data
-pandas>=2.0.0
-numpy>=1.24.0
+# ==========================================
+# Document Processing
+# ==========================================
+dateparser==1.4.0
+pdfplumber==0.11.9
+pypdf==6.12.2
+python-docx==1.2.0
 
-# ML (Prediction module — Teammates 2+3)
-scikit-learn>=1.4.0
+# ==========================================
+# Visualization
+# ==========================================
+matplotlib==3.10.9
+
+# ==========================================
+# HTTP Clients
+# ==========================================
+httpx==0.28.1
+
+# ==========================================
+# Web Scraping
+# ==========================================
+beautifulsoup4==4.14.3
+lxml==6.1.1
+
+# ==========================================
+# Security
+# ==========================================
+bcrypt==5.0.0
+cryptography==48.0.0
+
+# ==========================================
+# Utilities
+# ==========================================
+orjson==3.11.9
+PyYAML==6.0.3
+schedule==1.2.2
+tenacity==9.1.4
+tqdm==4.67.3
+typer==0.25.1
+
+# ==========================================
+# FinBERT (Enable if used)
+# ==========================================
+huggingface_hub==1.17.0
+safetensors==0.7.0
+tokenizers==0.22.2
+transformers==5.10.1
+
+# ==========================================
+# Optional Local Embeddings
+# ==========================================
+onnxruntime==1.26.0
