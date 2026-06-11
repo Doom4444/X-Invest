@@ -381,4 +381,5 @@ X-Invest is an educational project and does not offer professional investment ad
 
 ## License
 
-MIT License. Free to use, modify, and build upon.
+MIT — free to use, modify, and build on.
+
