@@ -374,3 +374,4 @@ X-Invest is an educational tool built as a university graduation project. It doe
 ## License
 
 MIT — free to use, modify, and build on.
+
