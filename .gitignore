@@ -231,10 +231,13 @@ data/documents/*
 
 prediction/saved_models/*
 !prediction/saved_models/.gitkeep
-
-# datasets
-data/
+prediction/saved_models/*.pkl
+prediction/financial_data.csv
 *.csv
+data/ml_data/*
+test_rag.py
+test_results.txt# datasets
+data/
 
 # archives
 *.zip

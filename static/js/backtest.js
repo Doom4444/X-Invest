@@ -237,13 +237,13 @@ function displayTrades(trades) {
             <td>${new Date(trade.exit).toLocaleDateString()}</td>
             <td>$${trade.entry_price.toFixed(2)}</td>
             <td>$${trade.exit_price.toFixed(2)}</td>
-            <td>${trade.shares}</td>
+            <td>${trade.shares.toFixed(2)}</td>
             <td>${trade.hold_days} days</td>
-            <td style="color: ${trade.pnl >= 0 ? 'green' : 'red'}">
-                $${trade.pnl.toFixed(2)}
+            <td style="color: ${trade.pnl >= 0 ? 'var(--success)' : 'var(--error)'}; font-weight: 600;">
+                ${trade.pnl >= 0 ? '+' : '-'}$${Math.abs(trade.pnl).toFixed(2)}
             </td>
-            <td style="color: ${trade.pnl_pct >= 0 ? 'green' : 'red'}">
-                ${trade.pnl_pct.toFixed(2)}%
+            <td style="color: ${trade.pnl_pct >= 0 ? 'var(--success)' : 'var(--error)'}; font-weight: 600;">
+                ${trade.pnl_pct >= 0 ? '+' : ''}${(trade.pnl_pct * 100).toFixed(2)}%
             </td>
         </tr>
     `).join('');

@@ -16,12 +16,12 @@ for p in [ROOT_DIR, SCRIPT_DIR]:
         sys.path.insert(0, p)
 
 try:
-    from prediction.Train import get_features, get_features_until_date, FEATURES
+    from prediction.train import get_features, get_features_until_date, FEATURES
 except ImportError:
     pred_dir = os.path.join(ROOT_DIR, "prediction")
     if pred_dir not in sys.path:
         sys.path.insert(0, pred_dir)
-    from Train import get_features, get_features_until_date, FEATURES
+    from train import get_features, get_features_until_date, FEATURES
 
 try:
     from Sentiment import get_latest_sentiment

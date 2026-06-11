@@ -3,6 +3,15 @@
 # Connects all routers and serves HTML pages.
 # No business logic lives here -- everything is in api/, pipeline/, market/
 
+import sys
+# Ensure standard streams use UTF-8 on Windows to prevent UnicodeEncodeError
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+
 import logging
 from pathlib import Path
 
@@ -36,7 +45,7 @@ def _home_bg_context() -> dict:
     return {"home_bg_file": "home-bg.png", "home_bg_version": 0}
 
 def _include_routers() -> None:
-    for module_name in ("api.chat", "api.market", "api.signal"):
+    for module_name in ("api.chat", "api.market", "api.signal", "api.backtest_api"):
         try:
             mod = __import__(module_name, fromlist=["router"])
             router = getattr(mod, "router", None)
@@ -50,18 +59,41 @@ def _include_routers() -> None:
 _include_routers()
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Pre-cache Markets dashboard data on application startup to prevent initial user delays."""
+    try:
+        from market.dashboard_feed import pre_warm_synchronously
+        pre_warm_synchronously()
+    except Exception as exc:
+        logger.exception("Failed to pre-warm dashboard cache on startup: %s", exc)
+
+
 @app.get("/")
 async def home(request: Request):
     ctx = {"request": request, **_home_bg_context()}
-    return templates.TemplateResponse("index.html", ctx)
+    return templates.TemplateResponse(
+    request=request,
+    name="index.html",
+    context=ctx
+)
 
 @app.get("/chat")
 async def chat_page(request: Request):
-    return templates.TemplateResponse("chat.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="chat.html",
+        context={"request": request},
+    )
+
 
 @app.get("/market")
 async def market_page(request: Request):
-    return templates.TemplateResponse("market.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="market.html",
+        context={"request": request},
+    )
 
 @app.get("/debug/routes")
 async def debug_routes():
@@ -73,3 +105,11 @@ async def debug_routes():
         if path and methods:
             paths.append({"path": path, "methods": methods})
     return {"routes": paths}
+
+@app.get("/backtest")
+async def backtest_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="backtest.html",
+        context={"request": request},
+    )

@@ -1504,23 +1504,3 @@ body.market-page {
 .cp-error-title { font-weight: 700; color: var(--error); margin-bottom: 0.5rem; }
 .cp-error-msg { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
 .cp-error-hint { font-size: 0.75rem; color: var(--text-muted); }
-
-.market-loading,
-.market-error {
-  padding: 1.5rem 1rem;
-  text-align: center;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.market-error {
-  color: var(--red);
-}
-
-body.market-page .macro-val,
-body.market-page .cstat-v,
-body.market-page .chart-price,
-body.market-page .matrix-table td,
-body.market-page .cp-v {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-}
